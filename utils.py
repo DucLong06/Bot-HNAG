@@ -66,6 +66,7 @@ def bot_command_handlers():
 
     2️⃣ Tính tiền nhóm:
     /debt [số tiền] - Khai báo số tiền (dành cho người được chọn trả tiền)
+    /pay [@user1 @user2]` - Thêm người vào danh sách chia tiền
 
     ⚠️ Các tính năng khác được chạy tự động theo lịch:
     - Tạo poll chọn món ăn
@@ -300,6 +301,48 @@ def bot_command_handlers():
             except Exception as e:
                 logger.error(f"Error registering debt: {str(e)}")
                 bot.reply_to(message, "Có lỗi xảy ra khi xử lý khai báo tiền!")
+
+    @bot.message_handler(commands=['pay'])
+    def add_payment_participants(message):
+        try:
+            # Get mentioned users from the message
+            if not message.entities or len(message.entities) < 2:  # First entity is the command itself
+                bot.reply_to(message, "Vui lòng tag người cần thêm vào danh sách! Ví dụ: /pay @user1 @user2")
+                return
+
+            active_votes = load_active_votes()
+            if 'today_foods' not in active_votes:
+                bot.reply_to(message, "Chưa có bữa ăn nào được chọn!")
+                return
+
+            # Initialize voters dict if not exists
+            if 'voters' not in active_votes:
+                active_votes['voters'] = {}
+            if 'manual_participants' not in active_votes['voters']:
+                active_votes['voters']['manual_participants'] = []
+
+            # Process mentioned users
+            added_users = []
+            for entity in message.entities[1:]:  # Skip the first entity (command)
+                if entity.type == 'mention':
+                    username = message.text[entity.offset:entity.offset + entity.length]
+                    if username not in active_votes['voters']['manual_participants']:
+                        active_votes['voters']['manual_participants'].append(username)
+                        added_users.append(username)
+
+            save_active_votes(active_votes)
+
+            if added_users:
+                response = f"✅ Đã thêm {', '.join(added_users)} vào danh sách chia tiền!"
+            else:
+                response = "❌ Không có người dùng mới nào được thêm vào danh sách!"
+
+            bot.reply_to(message, response)
+            logger.info(f"Added payment participants: {added_users}")
+
+        except Exception as e:
+            logger.error(f"Error adding payment participants: {str(e)}")
+            bot.reply_to(message, "Có lỗi xảy ra khi thêm người vào danh sách chia tiền!")
 
 
 @bot.poll_answer_handler()

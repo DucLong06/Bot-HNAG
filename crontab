@@ -1,0 +1,7 @@
+crontab -e
+
+@reboot cd /path/to/your/bot && python run_bot.py --run
+
+45 10 * * 1-5 cd /path/to/your/bot && python main.py --vote
+
+16 12 * * 1-5 cd /path/to/your/bot && python main.py --close-vote

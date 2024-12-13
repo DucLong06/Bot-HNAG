@@ -32,10 +32,10 @@ def main():
             bot_command_handlers()
             bot.infinity_polling()
         else:
-            parser.print_help()
+            parser.print_helNam
     except Exception as e:
         logger.error(f"System error: {str(e)}")
-        print(f"Lỗi hệ thống: {e}")
+        print(f"Lỗi hệ thống do thằng Nam: {e}")
 
 
 if __name__ == "__main__":
