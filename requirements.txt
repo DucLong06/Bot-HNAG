@@ -1,3 +1,4 @@
 telebot
 loguru
 python-dotenv
+psutil

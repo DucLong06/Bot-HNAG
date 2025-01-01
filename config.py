@@ -12,9 +12,9 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
 # File paths
-FOOD_FILE = 'food_list.json'
-ACTIVE_VOTE_FILE = 'active_votes.json'
-COMPLETED_VOTE_FILE = 'completed_votes.json'
+FOOD_FILE = 'data/food_list.json'
+ACTIVE_VOTE_FILE = 'data/active_votes.json'
+COMPLETED_VOTE_FILE = 'data/completed_votes.json'
 
 # Initialize bot
 if not BOT_TOKEN or not CHAT_ID:

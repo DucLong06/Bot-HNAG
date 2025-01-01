@@ -223,7 +223,7 @@ def bot_command_handlers():
             logger.error(f"Error registering debt: {str(e)}")
             bot.reply_to(message, "Có lỗi xảy ra khi xử lý khai báo tiền!")
             try:
-                current_time = datetime.now().strftime("%H:%M")
+                current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
                 active_votes = load_active_votes()
                 if 'today_foods' not in active_votes:
                     bot.reply_to(message, "Chưa có bữa ăn nào được chọn!")
@@ -235,11 +235,9 @@ def bot_command_handlers():
                     bot.reply_to(message, "Vui lòng nhập số tiền hợp lệ! Ví dụ: /debt 100000")
                     return
 
-                # Lấy thông tin người trả tiền
                 payer = message.from_user
                 payer_name = f"{payer.first_name} {payer.last_name if payer.last_name else ''}".strip()
 
-                # Lấy vote gần nhất từ completed_votes
                 completed_votes = load_completed_votes()
                 if not completed_votes:
                     # Nếu không có vote nào trước đó, tạo danh sách chỉ với người trả tiền
@@ -264,7 +262,6 @@ def bot_command_handlers():
                 result += f"💰 Mỗi người: {per_person:,.0f}đ\n\n"
                 result += "📋 Danh sách người cần đóng tiền:\n"
 
-                # Sắp xếp và hiển thị danh sách
                 sorted_participants = sorted(participants)
                 for idx, participant in enumerate(sorted_participants, 1):
                     if participant == payer_name:
@@ -302,86 +299,146 @@ def bot_command_handlers():
                 logger.error(f"Error registering debt: {str(e)}")
                 bot.reply_to(message, "Có lỗi xảy ra khi xử lý khai báo tiền!")
 
-    @bot.message_handler(commands=['pay'])
-    def add_payment_participants(message):
+    @bot.message_handler(commands=['debt'])
+    def register_debt(message):
         try:
-            # Get mentioned users from the message
-            if not message.entities or len(message.entities) < 2:  # First entity is the command itself
-                bot.reply_to(message, "Vui lòng tag người cần thêm vào danh sách! Ví dụ: /pay @user1 @user2")
+            now = datetime.now()
+            active_votes = load_active_votes()
+
+            if 'today_foods' not in active_votes or 'participants' not in active_votes:
+                bot.reply_to(message, "Chưa có bữa ăn nào được chọn hoặc danh sách người đi ăn trống!")
+                return
+
+            try:
+                amount = float(message.text.split()[1])
+            except (IndexError, ValueError):
+                bot.reply_to(message, "Vui lòng nhập số tiền hợp lệ! Ví dụ: /debt 100000")
+                return
+
+            # Get payer info
+            payer = message.from_user
+            payer_name = f"{payer.first_name} {payer.last_name if payer.last_name else ''}".strip()
+
+            # Add payer if they're not in the list
+            if payer_name not in active_votes['participants']:
+                active_votes['participants'].append(payer_name)
+
+            total_participants = len(active_votes['participants'])
+            per_person = amount / total_participants
+
+            # Prepare result message
+            result = f"💰 Chi tiết chia tiền [{now.strftime('%Y-%m-%d %H:%M')}]:\n\n"
+            result += f"🍽️ Món ăn: {active_votes['today_foods']}\n"
+            result += f"💵 Tổng tiền: {amount:,.0f}đ\n"
+            result += f"👥 Số người: {total_participants}\n"
+            result += f"💰 Mỗi người: {per_person:,.0f}đ\n\n"
+            result += "📋 Danh sách người cần đóng tiền:\n"
+
+            # Sort and display list
+            sorted_participants = sorted(active_votes['participants'])
+            for idx, participant in enumerate(sorted_participants, 1):
+                if participant == payer_name:
+                    result += f"{idx}. {participant}: {per_person:,.0f}đ (Người trả)\n"
+                else:
+                    result += f"{idx}. {participant}: {per_person:,.0f}đ\n"
+
+            # Display skipped participants
+            if active_votes.get('skipped'):
+                result += "\n🚫 Những người không tham gia:\n"
+                for idx, person in enumerate(sorted(active_votes['skipped']), 1):
+                    result += f"{idx}. {person}\n"
+
+            result += "\n💡 Vui lòng chuyển khoản cho người trả tiền!"
+
+            bot.send_message(CHAT_ID, result)
+
+            # Save to completed votes
+            completed_votes = load_completed_votes()
+            completed_votes[now.isoformat()] = {
+                'type': 'payment',
+                'datetime': now.isoformat(),
+                'payer': payer_name,
+                'amount': amount,
+                'per_person': per_person,
+                'food': active_votes['today_foods'],
+                'total_participants': total_participants,
+                'participants': sorted_participants,
+                'skipped': sorted(active_votes.get('skipped', []))
+            }
+            save_completed_votes(completed_votes)
+
+            # Clear active votes
+            active_votes.clear()
+            save_active_votes(active_votes)
+
+            logger.info(
+                f"Payment registered: {amount} by {payer_name}, "
+                f"per person: {per_person}, total participants: {total_participants}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error registering debt: {str(e)}")
+            bot.reply_to(message, "Có lỗi xảy ra khi xử lý khai báo tiền!")
+
+    @bot.message_handler(commands=['unpay'])
+    def remove_payment_participants(message):
+        try:
+            if not message.entities or len(message.entities) < 2:
+                bot.reply_to(message, "Vui lòng tag người cần xóa khỏi danh sách! Ví dụ: /unpay @user1 @user2")
                 return
 
             active_votes = load_active_votes()
-            if 'today_foods' not in active_votes:
-                bot.reply_to(message, "Chưa có bữa ăn nào được chọn!")
+            if 'participants' not in active_votes:
+                bot.reply_to(message, "Chưa có danh sách người đi ăn nào được tạo!")
                 return
 
-            # Initialize voters dict if not exists
-            if 'voters' not in active_votes:
-                active_votes['voters'] = {}
-            if 'manual_participants' not in active_votes['voters']:
-                active_votes['voters']['manual_participants'] = []
-
             # Process mentioned users
-            added_users = []
-            for entity in message.entities[1:]:  # Skip the first entity (command)
+            removed_users = []
+            for entity in message.entities[1:]:
                 if entity.type == 'mention':
                     username = message.text[entity.offset:entity.offset + entity.length]
-                    if username not in active_votes['voters']['manual_participants']:
-                        active_votes['voters']['manual_participants'].append(username)
-                        added_users.append(username)
+                    if username in active_votes['participants']:
+                        active_votes['participants'].remove(username)
+                        # Add to skipped list if not already there
+                        if 'skipped' not in active_votes:
+                            active_votes['skipped'] = []
+                        if username not in active_votes['skipped']:
+                            active_votes['skipped'].append(username)
+                        removed_users.append(username)
 
-            save_active_votes(active_votes)
+            if removed_users:
+                save_active_votes(active_votes)
+                # Show updated lists
+                response = "📋 Danh sách đã được cập nhật:\n\n"
+                response += "👥 Người đi ăn:\n"
+                for idx, participant in enumerate(sorted(active_votes['participants']), 1):
+                    response += f"{idx}. {participant}\n"
 
-            if added_users:
-                response = f"✅ Đã thêm {', '.join(added_users)} vào danh sách chia tiền!"
+                if active_votes.get('skipped'):
+                    response += "\n🚫 Người không tham gia:\n"
+                    for idx, person in enumerate(sorted(active_votes['skipped']), 1):
+                        response += f"{idx}. {person}\n"
+
+                bot.reply_to(message, response)
+                logger.info(f"Removed payment participants: {removed_users}")
             else:
-                response = "❌ Không có người dùng mới nào được thêm vào danh sách!"
-
-            bot.reply_to(message, response)
-            logger.info(f"Added payment participants: {added_users}")
+                bot.reply_to(message, "❌ Không có người dùng nào được xóa khỏi danh sách!")
 
         except Exception as e:
-            logger.error(f"Error adding payment participants: {str(e)}")
-            bot.reply_to(message, "Có lỗi xảy ra khi thêm người vào danh sách chia tiền!")
-
-
-@bot.poll_answer_handler()
-def handle_poll_answer(poll_answer):
-    try:
-        active_votes = load_active_votes()
-        if 'food_poll' not in active_votes:
-            return
-
-        poll_data = active_votes['food_poll']
-        if poll_answer.poll_id != poll_data['poll_id']:
-            return
-
-        user = poll_answer.user
-        user_name = f"{user.first_name} {user.last_name if user.last_name else ''}"
-        option_id = poll_answer.option_ids[0]
-        if 'votes' not in poll_data:
-            poll_data['votes'] = {}
-
-        poll_data['votes'][user_name] = poll_data['options'][option_id]
-        active_votes['food_poll'] = poll_data
-        save_active_votes(active_votes)
-
-        logger.bind(active_vote=True).info(f"Vote recorded: {user_name} voted for {poll_data['options'][option_id]}")
-
-    except Exception as e:
-        logger.error(f"Error handling poll answer: {str(e)}")
+            logger.error(f"Error removing payment participants: {str(e)}")
+            bot.reply_to(message, "Có lỗi xảy ra khi xóa người khỏi danh sách!")
 
 
 def create_food_poll():
     try:
-        current_time = datetime.now().strftime("%H:%M")
+        current_time = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
         food_data = load_food_list()
-        if len(food_data['foods']) > 8:
-            selected_foods = random.sample(food_data['foods'], 8)
+        if len(food_data['foods']) > 9:
+            selected_foods = random.sample(food_data['foods'], 9)
         else:
             selected_foods = food_data['foods']
 
-        options = selected_foods + ['Nhịn', 'Ăn gì cũng được']
+        options = selected_foods + ['Nhịn']
         poll = bot.send_poll(
             CHAT_ID,
             f"🍽️ [{current_time}] Hôm nay ăn gì?",
@@ -395,99 +452,126 @@ def create_food_poll():
             'poll_id': poll.poll.id,
             'message_id': poll.message_id,
             'options': options,
-            'votes': {},
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat(),
+            'status': 'active'
         }
         save_active_votes(active_votes)
         logger.bind(active_vote=True).info(f"Created food poll at {current_time}")
 
     except Exception as e:
         logger.error(f"Error creating food poll: {str(e)}")
+        bot.send_message(CHAT_ID, "❌ Có lỗi xảy ra khi tạo poll!")
 
 
 def close_food_poll():
-    active_votes = load_active_votes()
-    if 'food_poll' not in active_votes:
-        logger.error("No active food poll to close")
-        return
+    try:
+        active_votes = load_active_votes()
+        if ('food_poll' not in active_votes or
+                active_votes['food_poll'].get('status') != 'active'):
+            logger.error("No active food poll to close")
+            return
 
-    poll_data = active_votes['food_poll']
+        poll_data = active_votes['food_poll']
+        poll_message = bot.forward_message(CHAT_ID, CHAT_ID, poll_data['message_id'])
+        poll = poll_message.poll
 
-    # Get poll results
-    poll_message = bot.forward_message(CHAT_ID, CHAT_ID, poll_data['message_id'])
-    poll = poll_message.poll
+        if not poll:
+            logger.error("Could not get poll results")
+            bot.send_message(CHAT_ID, "❌ Không thể lấy kết quả poll!")
+            return
 
-    if not poll:
-        logger.error("Could not get poll results")
-        bot.send_message(CHAT_ID, "❌ Không thể lấy kết quả poll!")
-        return
+        vote_counts = {}
+        voters = {}  # Track who voted for what
+        total_voters = 0
+        participants = []  # List of people going to eat
+        skipped = []      # List of people who voted "Nhịn"
 
-    # Count votes
-    vote_counts = {}
-    voters = {}  # Track who voted for what
-    total_voters = 0
-
-    for i, option in enumerate(poll.options):
-        vote_count = option.voter_count
-        if vote_count > 0:
+        for i, option in enumerate(poll.options):
             option_text = poll_data['options'][i]
-            vote_counts[option_text] = vote_count
-            # Store voters for this option from poll_data votes
-            voters[option_text] = [user for user, vote in poll_data['votes'].items()
-                                   if vote == option_text]
-            total_voters += vote_count
+            if hasattr(option, 'voter_list'):
+                voters_for_option = []
+                for voter in option.voter_list:
+                    voter_name = f"{voter.first_name} {voter.last_name if voter.last_name else ''}".strip()
+                    voters_for_option.append(voter_name)
+                if voters_for_option:
+                    voters[option_text] = voters_for_option
+                    vote_counts[option_text] = len(voters_for_option)
+                    total_voters += len(voters_for_option)
 
-    # Select winning food
-    regular_options = [opt for opt in poll_data['options']
-                       if opt not in ['Nhịn', 'Ăn gì cũng được']]
+                    # Sort voters into participants and skipped
+                    if option_text == 'Nhịn':
+                        skipped.extend(voters_for_option)
+                    else:
+                        participants.extend(voters_for_option)
 
-    if vote_counts:
-        # Find option with most votes (excluding special options)
-        regular_votes = {k: v for k, v in vote_counts.items()
-                         if k in regular_options}
-        if regular_votes:
-            max_votes = max(regular_votes.values())
-            max_voted = [food for food, count in regular_votes.items()
-                         if count == max_votes]
-            selected_food = max_voted[0]  # Take first option with max votes
+        # Select winning food
+        regular_options = [opt for opt in poll_data['options'] if opt != 'Nhịn']
+
+        if vote_counts:
+            regular_votes = {k: v for k, v in vote_counts.items() if k in regular_options}
+            if regular_votes:
+                max_votes = max(regular_votes.values())
+                max_voted = [food for food, count in regular_votes.items() if count == max_votes]
+                selected_food = random.choice(max_voted)  # Random if multiple max
+            else:
+                selected_food = random.choice(regular_options)
         else:
-            # Only if no regular options received votes
             selected_food = random.choice(regular_options)
-    else:
-        selected_food = random.choice(regular_options)
 
-    # Store result with full datetime
-    now = datetime.now()
-    active_votes['today_foods'] = selected_food
-    active_votes['vote_time'] = now.isoformat()
-    active_votes['voters'] = voters  # Store who voted for what
-    save_active_votes(active_votes)
+        now = datetime.now()
 
-    # Save to completed votes
-    completed_votes = load_completed_votes()
-    completed_votes[now.isoformat()] = {
-        'type': 'food',
-        'selected': selected_food,
-        'poll_options': poll_data['options'],
-        'vote_counts': vote_counts,
-        'voters': voters
-    }
-    save_completed_votes(completed_votes)
+        # Update active_votes with participant information
+        active_votes.update({
+            'today_foods': selected_food,
+            'vote_time': now.isoformat(),
+            'participants': participants,
+            'skipped': skipped,
+            'voters': voters
+        })
+        save_active_votes(active_votes)
 
-    # Remove food poll but keep today's food and voters
-    del active_votes['food_poll']
-    save_active_votes(active_votes)
+        # Save to completed_votes
+        completed_votes = load_completed_votes()
+        completed_votes[now.isoformat()] = {
+            'type': 'food',
+            'selected': selected_food,
+            'poll_options': poll_data['options'],
+            'vote_counts': vote_counts,
+            'voters': voters,
+            'participants': participants,
+            'skipped': skipped,
+            'poll_id': poll_data['poll_id'],
+            'message_id': poll_data['message_id']
+        }
+        save_completed_votes(completed_votes)
 
-    # Send results
-    vote_summary = f"📊 Kết quả vote [{now.strftime('%Y-%m-%d %H:%M')}]:\n"
-    for food, count in vote_counts.items():
-        percentage = (count / total_voters) * 100
-        vote_summary += f"- {food}: {count} vote ({percentage:.1f}%)\n"
-    bot.send_message(CHAT_ID, vote_summary)
+        # Display vote summary
+        vote_summary = f"📊 Kết quả vote [{now.strftime('%d/%m/%Y, %H:%M:%S')}]:\n\n"
+        vote_summary += f"🍽️ Món được chọn: {selected_food}\n\n"
 
-    result_message = (
-        f"🎉 Kết quả: Hôm nay chúng ta sẽ ăn {selected_food}!\n\n"
-        "💰 Người thanh toán vui lòng dùng lệnh /debt [số tiền] để khai báo số tiền.\n"
-        "Ví dụ: /debt 100000"
-    )
-    bot.send_message(CHAT_ID, result_message)
+        # Display participants
+        vote_summary += "👥 Danh sách người đi ăn:\n"
+        for idx, participant in enumerate(sorted(participants), 1):
+            vote_summary += f"{idx}. {participant}\n"
+
+        # Display people who skipped
+        if skipped:
+            vote_summary += "\n🚫 Những người không tham gia:\n"
+            for idx, person in enumerate(sorted(skipped), 1):
+                vote_summary += f"{idx}. {person}\n"
+
+        vote_summary += "\n✏️ Để chỉnh sửa danh sách:\n"
+        vote_summary += "- Thêm người: /pay @tênngười\n"
+        vote_summary += "- Xóa người: /unpay @tênngười\n\n"
+        vote_summary += "💰 Sau khi chỉnh sửa xong, người thanh toán vui lòng dùng lệnh /debt [số tiền] để khai báo số tiền."
+
+        bot.send_message(CHAT_ID, vote_summary)
+
+        logger.info(
+            f"Poll closed successfully. Selected food: {selected_food}, "
+            f"Participants: {len(participants)}, Skipped: {len(skipped)}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error closing food poll: {str(e)}")
+        bot.send_message(CHAT_ID, "❌ Có lỗi xảy ra khi đóng poll!")

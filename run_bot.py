@@ -5,6 +5,9 @@ import subprocess
 import argparse
 from datetime import datetime
 from loguru import logger
+import os
+import signal
+import psutil
 
 # Configure logger
 logger.remove()  # Remove default handler
@@ -15,23 +18,18 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
     level="INFO"
 )
-logger.add(sys.stderr, level="INFO")  # Also log to console
+logger.add(sys.stderr, level="INFO")
 
 
 def run_bot():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--run', action='store_true', help='Run the bot continuously')
+    parser = argparse.ArgumentParser(description='Bot runner')
+    parser.add_argument('--run', action='store_true', help='run bot')
+    parser.add_argument('--stop', action='store_true', help='stop bot')
     args = parser.parse_args()
-
-    if not args.run:
-        logger.info("Please use --run flag to start the bot")
-        return
 
     while True:
         try:
-            logger.info("Starting bot...")
-
-            # Run the main.py script
+            logger.info("bot...")
             process = subprocess.Popen(
                 [sys.executable, 'main.py', '--run'],
                 stdout=subprocess.PIPE,
@@ -39,7 +37,6 @@ def run_bot():
                 universal_newlines=True
             )
 
-            # Monitor the process output
             while True:
                 output = process.stdout.readline()
                 if output:
@@ -49,28 +46,24 @@ def run_bot():
                 if error:
                     logger.error(error.strip())
 
-                # Check if process has ended
                 if process.poll() is not None:
                     break
 
-            # If we get here, the process has ended
             return_code = process.poll()
-
             if return_code != 0:
-                logger.error(f"Bot crashed with return code {return_code}")
+                logger.error(f"Bot crash {return_code}")
                 remaining_error = process.stderr.read()
                 if remaining_error:
-                    logger.error(f"Error details: {remaining_error}")
+                    logger.error(f"error: {remaining_error}")
             else:
-                logger.warning("Bot process ended normally")
+                logger.warning("Bot stop")
 
-            # Wait before restarting
-            logger.info("Waiting 5 seconds before restarting...")
+            logger.info("Wait 5 second...")
             time.sleep(5)
 
         except Exception as e:
-            logger.error(f"Runner error: {str(e)}")
-            logger.info("Waiting 5 seconds before restarting...")
+            logger.error(f"Lỗi runner do Nam: {str(e)}")
+            logger.info("Wait 5 second...")
             time.sleep(5)
 
 
