@@ -10,6 +10,7 @@ load_dotenv()
 # Bot configuration
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # File paths
 FOOD_FILE = 'data/food_list.json'

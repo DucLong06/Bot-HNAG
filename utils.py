@@ -1,10 +1,15 @@
+import base64
+from google.genai import types
+from google import genai
+import os
 import json
 from datetime import datetime
 import random
 from loguru import logger
 from config import (
     bot, CHAT_ID, FOOD_FILE, ACTIVE_VOTE_FILE,
-    COMPLETED_VOTE_FILE, DEFAULT_FOOD_LIST
+    COMPLETED_VOTE_FILE, DEFAULT_FOOD_LIST,
+    GEMINI_API_KEY
 )
 # File operations
 
@@ -51,6 +56,7 @@ def save_completed_votes(votes):
 
 
 def bot_command_handlers():
+
     @bot.message_handler(commands=['start'])
     def send_welcome(message):
         help_text = """
@@ -261,6 +267,31 @@ def bot_command_handlers():
                 logger.error(f"Error registering debt: {str(e)}")
                 bot.reply_to(message, "Có lỗi xảy ra khi xử lý khai báo tiền!")
 
+    @bot.message_handler(commands=['ai'])
+    def handle_ai_command(message):
+        try:
+            logger.info(f"Received AI command: {message.text}")
+
+            # Trích xuất nội dung sau lệnh /ai
+            command_parts = message.text.split(' ', 1)
+            if len(command_parts) > 1:
+                prompt = command_parts[1].strip()
+                logger.info(f"Extracted prompt: {prompt}")
+
+                if prompt:
+                    bot.send_chat_action(message.chat.id, 'typing')
+                    response = chat_with_gemini(prompt)
+                    bot.reply_to(message, response)
+                    logger.info("Response sent successfully")
+                else:
+                    bot.reply_to(message, "Vui lòng cung cấp nội dung sau lệnh /ai!")
+            else:
+                bot.reply_to(message, "Vui lòng cung cấp nội dung sau lệnh /ai!")
+
+        except Exception as e:
+            logger.error(f"Error in handle_ai_command: {str(e)}")
+            bot.reply_to(message, "Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn.")
+
 
 @bot.poll_answer_handler()
 def handle_poll_answer(poll_answer):
@@ -292,7 +323,7 @@ def create_food_poll():
             selected_foods = random.sample(food_data['foods'], 8)
         else:
             selected_foods = food_data['foods']
-        options = selected_foods + ['Nhịn', 'Ăn gì cũng được']
+        options = selected_foods + ['Nhịn', ]
         poll = bot.send_poll(
             CHAT_ID,
             f"🍽️ [{current_time}] Hôm nay ăn gì?",
@@ -342,7 +373,7 @@ def close_food_poll():
             total_voters += vote_count
     # Select winning food
     regular_options = [opt for opt in poll_data['options']
-                       if opt not in ['Nhịn', 'Ăn gì cũng được']]
+                       if opt not in ['Nhịn', ]]
     if vote_counts:
         # Find option with most votes (excluding special options)
         regular_votes = {k: v for k, v in vote_counts.items()
@@ -388,3 +419,45 @@ def close_food_poll():
         "Ví dụ: /debt 100000"
     )
     bot.send_message(CHAT_ID, result_message)
+
+
+def chat_with_gemini(prompt):
+    """Send prompt to Gemini and get response"""
+    try:
+        client = genai.Client(
+            api_key=GEMINI_API_KEY,
+        )
+
+        model = "gemini-2.0-flash"
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(
+                        text=prompt
+                    ),
+                ],
+            ),
+        ]
+
+        generate_content_config = types.GenerateContentConfig(
+            temperature=1,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            response_mime_type="text/plain",
+        )
+
+        # Collect the response chunks
+        response_text = ""
+        for chunk in client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
+        ):
+            response_text += chunk.text
+
+        return response_text
+    except Exception as e:
+        logger.error(f"Error chatting with Gemini: {str(e)}")
+        return "Sorry, I encountered an error while processing your request."
