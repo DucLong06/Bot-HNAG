@@ -3,13 +3,13 @@ from google.genai import types
 from google import genai
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from loguru import logger
 from config import (
     bot, CHAT_ID, FOOD_FILE, ACTIVE_VOTE_FILE,
     COMPLETED_VOTE_FILE, DEFAULT_FOOD_LIST,
-    GEMINI_API_KEY
+    GEMINI_API_KEY, WEEK_FOOD
 )
 # File operations
 
@@ -52,7 +52,64 @@ def save_active_votes(votes):
 def save_completed_votes(votes):
     with open(COMPLETED_VOTE_FILE, 'w', encoding='utf-8') as f:
         json.dump(votes, f, ensure_ascii=False, indent=2)
-# Bot command handlers
+
+
+def save_week_food(votes):
+    with open(WEEK_FOOD, 'w', encoding='utf-8') as f:
+        json.dump(votes, f, ensure_ascii=False, indent=2)
+
+
+def load_week_food():
+    try:
+        with open(WEEK_FOOD, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {'selected_foods': [], 'timestamps': []}
+
+
+def update_week_food(selected_food):
+    week_food = load_week_food()
+    current_time = datetime.now().isoformat()
+
+    week_food['selected_foods'].append(selected_food)
+    week_food['timestamps'].append(current_time)
+
+    one_week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+
+    new_selected_foods = []
+    new_timestamps = []
+
+    for food, timestamp in zip(week_food['selected_foods'], week_food['timestamps']):
+        try:
+            timestamp_dt = datetime.fromisoformat(timestamp)
+            one_week_ago_dt = datetime.fromisoformat(one_week_ago)
+
+            if timestamp_dt >= one_week_ago_dt:
+                new_selected_foods.append(food)
+                new_timestamps.append(timestamp)
+        except (ValueError, TypeError):
+            logger.error(f"Invalid timestamp format: {timestamp}")
+            continue
+
+    week_food['selected_foods'] = new_selected_foods
+    week_food['timestamps'] = new_timestamps
+
+    save_week_food(week_food)
+    logger.info(f"Updated week food list: added {selected_food}, total foods in past week: {len(new_selected_foods)}")
+    return week_food
+
+
+def get_available_foods():
+    food_data = load_food_list()
+    week_food = load_week_food()
+
+    available_foods = [food for food in food_data['foods']
+                       if food not in week_food['selected_foods']]
+
+    if len(available_foods) < 3:
+        logger.info("Available foods too few, adding some from previous week")
+        return food_data['foods']
+    return available_foods
 
 
 def bot_command_handlers():
@@ -318,11 +375,14 @@ def handle_poll_answer(poll_answer):
 def create_food_poll():
     try:
         current_time = datetime.now().strftime("%H:%M")
-        food_data = load_food_list()
-        if len(food_data['foods']) > 8:
-            selected_foods = random.sample(food_data['foods'], 8)
+
+        available_foods = get_available_foods()
+
+        if len(available_foods) > 8:
+            selected_foods = random.sample(available_foods, 8)
         else:
-            selected_foods = food_data['foods']
+            selected_foods = available_foods
+
         options = selected_foods + ['Nhịn', ]
         poll = bot.send_poll(
             CHAT_ID,
@@ -340,7 +400,8 @@ def create_food_poll():
             'created_at': datetime.now().isoformat()
         }
         save_active_votes(active_votes)
-        logger.bind(active_vote=True).info(f"Created food poll at {current_time}")
+        logger.bind(active_vote=True).info(
+            f"Created food poll at {current_time} with {len(selected_foods)} available foods")
     except Exception as e:
         logger.error(f"Error creating food poll: {str(e)}")
 
@@ -388,6 +449,9 @@ def close_food_poll():
             selected_food = random.choice(regular_options)
     else:
         selected_food = random.choice(regular_options)
+
+    update_week_food(selected_food)
+
     # Store result with full datetime
     now = datetime.now()
     active_votes['today_foods'] = selected_food

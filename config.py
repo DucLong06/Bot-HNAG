@@ -16,6 +16,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 FOOD_FILE = 'data/food_list.json'
 ACTIVE_VOTE_FILE = 'data/active_votes.json'
 COMPLETED_VOTE_FILE = 'data/completed_votes.json'
+WEEK_FOOD='data/week_food.json'
 
 # Initialize bot
 if not BOT_TOKEN or not CHAT_ID:

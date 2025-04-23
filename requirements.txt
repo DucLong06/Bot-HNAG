@@ -2,3 +2,5 @@ telebot
 loguru
 python-dotenv
 psutil
+google-generativeai
+google-genai

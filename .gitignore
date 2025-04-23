@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 resend_bill.py
-test.py
+# test.py
 # C extensions
 *.so
 completed_votes.json
