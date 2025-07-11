@@ -1,6 +1,6 @@
 import axios, { type AxiosResponse } from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 const api = axios.create({
     baseURL: `${API_BASE_URL}/api`,
@@ -10,32 +10,52 @@ const api = axios.create({
     }
 })
 
-// SỬA interceptor request
 api.interceptors.request.use(async (config) => {
     if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
-        try {
-            const csrfResponse = await axios.get(`${API_BASE_URL}/api/csrf/`, {
-                withCredentials: true
-            })
-            const csrfToken = csrfResponse.data.csrfToken
-            if (csrfToken) {
-                config.headers['X-CSRFToken'] = csrfToken
+
+        let csrfToken = getCookie('csrftoken')
+
+        if (!csrfToken) {
+            try {
+                await axios.get(`${API_BASE_URL}/api/csrf/`, {
+                    withCredentials: true
+                })
+                csrfToken = getCookie('csrftoken')
+            } catch (error) {
+                console.log('Could not get CSRF token:', error)
             }
-        } catch (error) {
-            console.log('Could not get CSRF token:', error)
+        }
+
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken
         }
     }
     return config
 })
 
+function getCookie(name: string) {
+    let cookieValue = null
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';')
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim()
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1))
+                break
+            }
+        }
+    }
+    return cookieValue
+}
+
 export const authApi = {
+    getCsrfToken: () => axios.get(`${API_BASE_URL}/api/csrf/`, { withCredentials: true }),
     login: (username: string, password: string) => {
         return api.post('/login/', { username, password })
     },
     logout: () => api.post('/logout/'),
-    user: () => api.get('/user/'),
+    user: () => api.get('/user/')
 }
-
 export const membersApi = {
     getAll: () => api.get('/members/'),
     create: (data: any) => api.post('/members/', data),
