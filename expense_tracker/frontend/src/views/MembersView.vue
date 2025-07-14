@@ -100,6 +100,26 @@
 							hint="ID Telegram để gửi nhắc nhở"
 							persistent-hint
 						></v-text-field>
+
+						<v-select
+							v-model="editedItem.bank_name"
+							:items="bankOptions"
+							label="Ngân hàng"
+							variant="outlined"
+							prepend-inner-icon="mdi-bank"
+							hint="Chọn ngân hàng"
+							persistent-hint
+							class="mb-3"
+						></v-select>
+
+						<v-text-field
+							v-model="editedItem.account_number"
+							label="Số tài khoản"
+							variant="outlined"
+							prepend-inner-icon="mdi-credit-card"
+							hint="Số tài khoản ngân hàng"
+							persistent-hint
+						></v-text-field>
 					</v-form>
 				</v-card-text>
 
@@ -171,22 +191,41 @@ const deleting = ref(false);
 const editedIndex = ref(-1);
 const members = ref([]);
 const memberToDelete = ref(null);
-
+const bankOptions = [
+	"Vietcombank",
+	"Techcombank",
+	"BIDV",
+	"VietinBank",
+	"Agribank",
+	"MB Bank",
+	"ACB",
+	"Sacombank",
+	"Eximbank",
+	"SHB",
+	"TPBank",
+	"VPBank",
+	"HDBank",
+];
 const headers = [
 	{ title: "Tên", key: "name" },
 	{ title: "Telegram ID", key: "telegram_id" },
+	{ title: "Ngân hàng", key: "bank_name" },
+	{ title: "Số TK", key: "account_number" },
 	{ title: "Ngày tạo", key: "created_at" },
 	{ title: "Hành động", key: "actions", sortable: false },
 ];
-
 const editedItem = ref({
 	name: "",
 	telegram_id: "",
+	bank_name: "",
+	account_number: "",
 });
 
 const defaultItem = {
 	name: "",
 	telegram_id: "",
+	bank_name: "",
+	account_number: "",
 };
 
 const fetchMembers = async () => {

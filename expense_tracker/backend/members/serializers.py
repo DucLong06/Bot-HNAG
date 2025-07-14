@@ -5,4 +5,4 @@ from .models import Member
 class MemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = Member
-        fields = '__all__'
+        fields = ['id', 'name', 'telegram_id', 'bank_name', 'account_number', 'created_at']  # THÊM bank fields

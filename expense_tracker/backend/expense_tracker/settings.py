@@ -81,7 +81,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://172.24.123.109:3000'
+    'http://172.24.123.109'
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -114,4 +114,3 @@ SESSION_COOKIE_NAME = 'sessionid'
 SESSION_COOKIE_PATH = '/'
 SESSION_COOKIE_SECURE = False  # True in production with HTTPS
 SESSION_COOKIE_SAMESITE = 'Lax'  # SỬA từ None thành 'Lax'
-
