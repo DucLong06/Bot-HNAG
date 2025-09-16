@@ -1,9 +1,9 @@
 import axios, { type AxiosResponse } from 'axios'
 
-const API_BASE_URL = "http://172.24.123.109:8000"
+const API_BASE_URL = ''
 
 const api = axios.create({
-    baseURL: `${API_BASE_URL}/api`,
+    baseURL: `${API_BASE_URL}`,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -17,7 +17,7 @@ api.interceptors.request.use(async (config) => {
 
         if (!csrfToken) {
             try {
-                await axios.get(`${API_BASE_URL}/api/csrf/`, {
+                await axios.get(`${API_BASE_URL}/csrf/`, {
                     withCredentials: true
                 })
                 csrfToken = getCookie('csrftoken')
@@ -49,7 +49,7 @@ function getCookie(name: string) {
 }
 
 export const authApi = {
-    getCsrfToken: () => axios.get(`${API_BASE_URL}/api/csrf/`, { withCredentials: true }),
+    getCsrfToken: () => axios.get(`${API_BASE_URL}/csrf/`, { withCredentials: true }),
     login: (username: string, password: string) => {
         return api.post('/login/', { username, password })
     },

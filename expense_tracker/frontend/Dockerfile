@@ -1,4 +1,4 @@
-FROM node:18-alpine as build
+FROM node:22-alpine as build
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Build the project
-RUN npm run build-only
+RUN npm run build
 
 # Keep the dist folder in a volume
 VOLUME /app/dist
