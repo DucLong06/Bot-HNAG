@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:18-alpine as build
 
 WORKDIR /app
 
@@ -8,10 +8,11 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source
+# Copy project files
 COPY . .
 
-EXPOSE 3000
+# Build the project
+RUN npm run build-only
 
-# Run dev server
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Keep the dist folder in a volume
+VOLUME /app/dist

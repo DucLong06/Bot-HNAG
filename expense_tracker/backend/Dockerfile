@@ -2,17 +2,28 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy project
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
 COPY . .
 
-# Create entrypoint
-RUN echo '#!/bin/bash\npython manage.py migrate\nexec python manage.py runserver 0.0.0.0:8000' > entrypoint.sh
-RUN chmod +x entrypoint.sh
+# Collect static files
+RUN python manage.py collectstatic --noinput
 
-EXPOSE 8000
+# Run migrations
+RUN python manage.py migrate --noinput
 
-CMD ["./entrypoint.sh"]
+# Copy Entrypoint
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+# Run daphne by default
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
