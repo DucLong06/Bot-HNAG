@@ -7,7 +7,6 @@ resend_bill.py
 # C extensions
 *.so
 completed_votes.json
-*.json 
 nohup.out
 .env
 
