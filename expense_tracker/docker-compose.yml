@@ -1,0 +1,52 @@
+version: "3.8"
+services:
+    postgres:
+        image: postgres:15
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        environment:
+            - POSTGRES_DB=Ticketbooking
+            - POSTGRES_USER=admin
+            - POSTGRES_PASSWORD=123456
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        volumes:
+            - static_files:/app/staticfiles
+            - media_files:/app/media
+        env_file:
+            - .env
+        depends_on:
+            redis:
+                condition: service_healthy
+
+    # Uncomment the following lines if you want to use Redis
+
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        volumes:
+            - frontend_dist:/app/dist
+
+    nginx:
+        build:
+            context: .
+            dockerfile: nginx/Dockerfile
+        ports:
+            - "80:80"
+        volumes:
+            - static_files:/app/staticfiles
+            - media_files:/app/media
+            - frontend_dist:/frontend
+        depends_on:
+            - backend
+            - frontend
+
+volumes:
+    postgres_data:
+    static_files:
+    media_files:
+    frontend_dist:

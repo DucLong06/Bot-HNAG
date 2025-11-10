@@ -9,6 +9,7 @@ resend_bill.py
 completed_votes.json
 *.json 
 nohup.out
+.env
 
 # Distribution / packaging
 .Python
