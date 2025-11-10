@@ -18,9 +18,6 @@ services:
             - media_files:/app/media
         env_file:
             - .env
-        depends_on:
-            redis:
-                condition: service_healthy
 
     # Uncomment the following lines if you want to use Redis
 
