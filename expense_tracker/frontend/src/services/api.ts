@@ -1,6 +1,8 @@
+// Updated content for expense_tracker/frontend/src/services/api.ts
+
 import axios, { type AxiosResponse } from 'axios'
 
-const API_BASE_URL = ''
+const API_BASE_URL = 'http://localhost:8000/api'
 
 const api = axios.create({
     baseURL: `${API_BASE_URL}`,
@@ -56,15 +58,19 @@ export const authApi = {
     logout: () => api.post('/logout/'),
     user: () => api.get('/user/')
 }
+
 export const membersApi = {
-    getAll: () => api.get('/members/'),
+    getAll: (search?: string) => api.get('/members/', { params: { search } }),
     create: (data: any) => api.post('/members/', data),
     update: (id: number, data: any) => api.put(`/members/${id}/`, data),
-    delete: (id: number) => api.delete(`/members/${id}/`)
+    delete: (id: number) => api.delete(`/members/${id}/`),
+    getDebtSummary: (id: number) => api.get(`/members/${id}/debt_summary/`)
 }
 
 export const expensesApi = {
-    getAll: () => api.get('/expenses/'),
+    getAll: (search?: string, payer?: number | null) =>
+        api.get('/expenses/', { params: { search, payer } }),
+
     get: (id: number) => api.get(`/expenses/${id}/`),
     create: (data: any) => api.post('/expenses/', data),
     update: (id: number, data: any) => api.put(`/expenses/${id}/`, data),
@@ -77,7 +83,11 @@ export const telegramApi = {
     sendReminder: (memberId: number) =>
         api.post('/telegram/send-reminder/', { member_id: memberId }),
     sendBulkReminders: (memberIds: number[]) =>
-        api.post('/telegram/send-bulk-reminders/', { member_ids: memberIds })
+        api.post('/telegram/send-bulk-reminders/', { member_ids: memberIds }),
+
+    // NEW: API tập trung tạo QR Code
+    generateQrCode: (data: { bank_name: string, account_number: string, amount: number, description: string, account_name: string }) =>
+        api.post('/telegram/generate-qr/', data)
 }
 
 export default api

@@ -876,17 +876,7 @@ body {
     }
 }
 
-/* Focus Styles for Accessibility */
-.v-btn:focus-visible,
-.v-text-field:focus-within,
-.v-select:focus-within,
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-    outline: 2px solid var(--primary) !important;
-    outline-offset: 2px !important;
-}
+
 
 /* Custom selection colors */
 ::selection {

@@ -1,6 +1,5 @@
 <template>
 	<div class="expenses-page">
-		<!-- Page Header -->
 		<div class="page-header mb-8">
 			<div class="header-content">
 				<div class="header-text">
@@ -35,7 +34,50 @@
 			</div>
 		</div>
 
-		<!-- Expenses Grid -->
+		<div class="filter-bar mb-6">
+			<v-card class="pa-4 glass-effect" rounded="lg" elevation="0">
+				<v-row align="center">
+					<v-col cols="12" md="4">
+						<v-text-field
+							v-model="search"
+							prepend-inner-icon="mdi-magnify"
+							label="Tìm kiếm khoản chi..."
+							variant="outlined"
+							density="compact"
+							hide-details
+							rounded="lg"
+							@update:model-value="handleSearch"
+						></v-text-field>
+					</v-col>
+					<v-col cols="12" md="4">
+						<v-select
+							v-model="selectedPayer"
+							:items="members"
+							item-title="name"
+							item-value="id"
+							label="Lọc theo chủ nợ (Người trả)"
+							prepend-inner-icon="mdi-account-cash"
+							variant="outlined"
+							density="compact"
+							hide-details
+							rounded="lg"
+							clearable
+							@update:model-value="handleFilter"
+						></v-select>
+					</v-col>
+					<v-col cols="12" md="4" class="text-right">
+						<v-chip
+							v-if="expenses.length > 0"
+							color="primary"
+							variant="tonal"
+						>
+							Hiển thị {{ expenses.length }} khoản chi
+						</v-chip>
+					</v-col>
+				</v-row>
+			</v-card>
+		</div>
+
 		<div v-if="expenses.length > 0">
 			<v-row>
 				<v-col
@@ -51,7 +93,6 @@
 						elevation="0"
 						:style="`animation-delay: ${index * 100}ms`"
 					>
-						<!-- Card Header -->
 						<div class="card-header pa-6 pb-0">
 							<div
 								class="d-flex align-center justify-space-between mb-4"
@@ -79,7 +120,6 @@
 							</div>
 						</div>
 
-						<!-- Card Content -->
 						<v-card-text class="pa-6 pt-0">
 							<div class="expense-details space-y-3">
 								<div class="detail-item d-flex align-center">
@@ -97,17 +137,17 @@
 								</div>
 
 								<div class="detail-item d-flex align-center">
-									<v-icon
-										size="18"
-										color="orange"
-										class="mr-3"
-										>mdi-account-group</v-icon
+									<v-icon size="18" color="info" class="mr-3"
+										>mdi-account-edit</v-icon
 									>
-									<span class="detail-label">Số người:</span>
+									<span class="detail-label">Người tạo:</span>
 									<span
-										class="detail-value ml-auto font-medium"
-										>{{ expense.participants.length }}</span
+										class="detail-value ml-auto font-medium text-xs text-surface-variant"
 									>
+										{{
+											expense.created_by_name || "Unknown"
+										}}
+									</span>
 								</div>
 
 								<div class="detail-item d-flex align-center">
@@ -120,16 +160,14 @@
 									<span class="detail-label">Ngày tạo:</span>
 									<span
 										class="detail-value ml-auto font-medium"
-										>{{
-											formatDate(expense.created_at)
-										}}</span
 									>
+										{{ formatDate(expense.created_at) }}
+									</span>
 								</div>
 							</div>
 
 							<v-divider class="my-4"></v-divider>
 
-							<!-- Participants Status -->
 							<div class="participants-section">
 								<h4
 									class="participants-title font-medium mb-3 d-flex align-center"
@@ -174,10 +212,19 @@
 										+{{ expense.participants.length - 6 }}
 									</v-chip>
 								</div>
+
+								<div
+									v-if="!expense.is_owner"
+									class="text-xs mt-3 text-warning d-flex align-center"
+								>
+									<v-icon size="14" class="mr-1"
+										>mdi-lock-outline</v-icon
+									>
+									Chỉ người tạo mới có quyền chỉnh sửa
+								</div>
 							</div>
 						</v-card-text>
 
-						<!-- Card Actions -->
 						<v-card-actions class="pa-6 pt-0">
 							<v-btn
 								:to="`/expenses/${expense.id}`"
@@ -191,39 +238,49 @@
 								Chi tiết
 							</v-btn>
 
-							<v-btn
-								@click="editExpense(expense)"
-								color="orange"
-								variant="outlined"
-								size="small"
-								rounded="lg"
-								class="mr-2"
-							>
-								<v-icon size="16" class="mr-1"
-									>mdi-pencil</v-icon
+							<template v-if="expense.is_owner">
+								<v-btn
+									@click="editExpense(expense)"
+									color="orange"
+									variant="outlined"
+									size="small"
+									rounded="lg"
+									class="mr-2"
 								>
-								Sửa
-							</v-btn>
+									<v-icon size="16" class="mr-1"
+										>mdi-pencil</v-icon
+									>
+									Sửa
+								</v-btn>
 
-							<v-btn
-								@click="deleteExpense(expense)"
-								color="red"
-								variant="outlined"
-								size="small"
-								rounded="lg"
-							>
-								<v-icon size="16" class="mr-1"
-									>mdi-delete</v-icon
+								<v-btn
+									@click="deleteExpense(expense)"
+									color="red"
+									variant="outlined"
+									size="small"
+									rounded="lg"
 								>
-								Xóa
-							</v-btn>
+									<v-icon size="16" class="mr-1"
+										>mdi-delete</v-icon
+									>
+									Xóa
+								</v-btn>
+							</template>
+							<template v-else>
+								<v-spacer></v-spacer>
+								<v-icon
+									color="grey-lighten-1"
+									size="20"
+									v-tooltip="'Không có quyền sửa'"
+									>mdi-lock</v-icon
+								>
+							</template>
 						</v-card-actions>
 					</v-card>
 				</v-col>
 			</v-row>
 		</div>
 
-		<!-- Empty State -->
 		<div v-else class="empty-state">
 			<v-card class="empty-card text-center pa-12" rounded="xl">
 				<div class="empty-icon mb-6">
@@ -233,18 +290,25 @@
 					<div class="empty-decoration"></div>
 				</div>
 				<h3 class="empty-title text-2xl font-bold mb-4">
-					Chưa có khoản chi tiêu nào
+					Không tìm thấy khoản chi tiêu nào
 				</h3>
 				<p class="empty-subtitle text-lg text-on-surface-variant mb-8">
-					Hãy tạo khoản chi tiêu đầu tiên để bắt đầu quản lý
+					Thử thay đổi bộ lọc hoặc tạo khoản chi mới
 				</p>
+				<v-btn
+					color="primary"
+					@click="openAddDialog"
+					size="large"
+					rounded="xl"
+				>
+					<v-icon size="20" class="mr-2">mdi-plus</v-icon>
+					Tạo khoản chi tiêu
+				</v-btn>
 			</v-card>
 		</div>
 
-		<!-- Add/Edit Dialog -->
 		<v-dialog v-model="dialog" max-width="1000px" persistent scrollable>
 			<v-card class="dialog-card" rounded="xl">
-				<!-- Dialog Header -->
 				<div class="dialog-header pa-6 pb-0">
 					<div class="d-flex align-center">
 						<div class="dialog-icon mr-4">
@@ -275,10 +339,8 @@
 					</div>
 				</div>
 
-				<!-- Dialog Content -->
 				<v-card-text class="pa-6" style="max-height: 70vh">
 					<v-form ref="form" v-model="valid">
-						<!-- Basic Info Section -->
 						<div class="form-section mb-6">
 							<h4 class="section-title mb-4">Thông tin cơ bản</h4>
 							<v-row>
@@ -369,7 +431,6 @@
 							</v-row>
 						</div>
 
-						<!-- Participants Section -->
 						<div class="form-section">
 							<div class="participants-header mb-4">
 								<h4 class="section-title">Người tham gia</h4>
@@ -401,7 +462,6 @@
 								</div>
 							</div>
 
-							<!-- Total Error Alert -->
 							<v-expand-transition>
 								<v-alert
 									v-if="totalError"
@@ -433,7 +493,6 @@
 								</v-alert>
 							</v-expand-transition>
 
-							<!-- Empty Participants -->
 							<div
 								v-if="editedItem.participant_data.length === 0"
 								class="empty-participants text-center py-8"
@@ -446,7 +505,6 @@
 								</p>
 							</div>
 
-							<!-- Participants List -->
 							<div v-else class="participants-list">
 								<div
 									v-for="(
@@ -552,7 +610,6 @@
 					</v-form>
 				</v-card-text>
 
-				<!-- Dialog Actions -->
 				<v-card-actions class="pa-6 pt-0">
 					<v-spacer></v-spacer>
 					<v-btn
@@ -583,7 +640,6 @@
 			</v-card>
 		</v-dialog>
 
-		<!-- Success Snackbar -->
 		<v-snackbar
 			v-model="snackbar.show"
 			:color="snackbar.color"
@@ -620,6 +676,10 @@ const saving = ref(false);
 const editedIndex = ref(-1);
 const expenses = ref([]);
 const members = ref([]);
+
+// Filters
+const search = ref("");
+const selectedPayer = ref(null);
 
 // Snackbar for notifications
 const snackbar = reactive({
@@ -669,9 +729,23 @@ const showNotification = (
 	snackbar.show = true;
 };
 
+// Search and Filter Handlers
+let filterTimeout: any = null;
+const handleSearch = (val: string) => {
+	if (filterTimeout) clearTimeout(filterTimeout);
+	filterTimeout = setTimeout(() => fetchExpenses(), 500);
+};
+
+const handleFilter = (val: any) => {
+	fetchExpenses();
+};
+
 const fetchExpenses = async () => {
 	try {
-		const response = await expensesApi.getAll();
+		const response = await expensesApi.getAll(
+			search.value,
+			selectedPayer.value
+		);
 		expenses.value = response.data;
 	} catch (error) {
 		console.error("Error fetching expenses:", error);
@@ -697,8 +771,8 @@ const fetchMembers = async () => {
 	}
 };
 
-const getStatusColor = (expense) => {
-	const paidCount = expense.participants.filter((p) => p.is_paid).length;
+const getStatusColor = (expense: any) => {
+	const paidCount = expense.participants.filter((p: any) => p.is_paid).length;
 	const totalCount = expense.participants.length;
 
 	if (paidCount === totalCount) return "success";
@@ -706,8 +780,8 @@ const getStatusColor = (expense) => {
 	return "warning";
 };
 
-const getStatusText = (expense) => {
-	const paidCount = expense.participants.filter((p) => p.is_paid).length;
+const getStatusText = (expense: any) => {
+	const paidCount = expense.participants.filter((p: any) => p.is_paid).length;
 	const totalCount = expense.participants.length;
 
 	if (paidCount === totalCount) return "Hoàn thành";
@@ -743,13 +817,11 @@ const deleteExpense = async (expense: any) => {
 			showNotification(
 				`Đã xóa khoản chi tiêu "${expense.name}" thành công`
 			);
-		} catch (error) {
+		} catch (error: any) {
 			console.error("Error deleting expense:", error);
-			showNotification(
-				"Có lỗi khi xóa khoản chi tiêu",
-				"error",
-				"mdi-alert-circle"
-			);
+			const msg =
+				error.response?.data?.error || "Có lỗi khi xóa khoản chi tiêu";
+			showNotification(msg, "error", "mdi-alert-circle");
 		}
 	}
 };
@@ -795,13 +867,11 @@ const save = async () => {
 		}
 		await fetchExpenses();
 		close();
-	} catch (error) {
+	} catch (error: any) {
 		console.error("Error saving expense:", error);
-		showNotification(
-			"Có lỗi khi lưu khoản chi tiêu",
-			"error",
-			"mdi-alert-circle"
-		);
+		const msg =
+			error.response?.data?.error || "Có lỗi khi lưu khoản chi tiêu";
+		showNotification(msg, "error", "mdi-alert-circle");
 	} finally {
 		saving.value = false;
 	}
@@ -1113,6 +1183,33 @@ onMounted(() => {
 
 .modern-snackbar {
 	backdrop-filter: blur(10px);
+}
+
+/* Styles for Filter Bar */
+.glass-effect {
+	background: rgba(255, 255, 255, 0.8) !important;
+	backdrop-filter: blur(10px);
+	border: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+/* --- FIX FOR SQUARE BORDER ON CHECKBOXES/SWITCHES --- */
+/* Nguyên nhân: Xung đột giữa Tailwind CSS Preflight và Vuetify */
+:deep(input[type="checkbox"]),
+:deep(input[type="radio"]) {
+	position: absolute !important;
+	opacity: 0 !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	pointer-events: none !important;
+}
+
+/* Ẩn mũi tên input number */
+:deep(input[type="number"]::-webkit-outer-spin-button),
+:deep(input[type="number"]::-webkit-inner-spin-button) {
+	-webkit-appearance: none;
+	margin: 0;
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,5 @@
 <template>
 	<div class="members-page">
-		<!-- Page Header -->
 		<div class="page-header mb-8">
 			<div class="header-content">
 				<div class="header-text">
@@ -35,9 +34,7 @@
 			</div>
 		</div>
 
-		<!-- Members List Card -->
 		<v-card class="members-card" rounded="xl" elevation="0">
-			<!-- Card Header -->
 			<div class="card-header pa-6 pb-0">
 				<div class="d-flex align-center justify-space-between">
 					<div class="card-title-section">
@@ -54,7 +51,6 @@
 						</p>
 					</div>
 
-					<!-- Search -->
 					<div class="search-section">
 						<v-text-field
 							v-model="search"
@@ -66,6 +62,7 @@
 							style="min-width: 250px"
 							hide-details
 							single-line
+							@update:model-value="handleSearch"
 						>
 							<template v-slot:prepend-inner>
 								<v-icon color="surface-variant"
@@ -77,12 +74,10 @@
 				</div>
 			</div>
 
-			<!-- Data Table -->
 			<div class="table-container pa-6 pt-4">
 				<v-data-table
 					:headers="headers"
 					:items="members"
-					:search="search"
 					class="modern-table"
 					:loading="loading"
 					loading-text="Đang tải dữ liệu..."
@@ -165,6 +160,17 @@
 							<v-btn
 								icon
 								size="small"
+								color="error"
+								variant="text"
+								@click="viewDebtSummary(item)"
+								class="action-btn"
+								v-tooltip="'Xem công nợ'"
+							>
+								<v-icon size="18">mdi-cash-multiple</v-icon>
+							</v-btn>
+							<v-btn
+								icon
+								size="small"
 								color="orange"
 								variant="text"
 								@click="editMember(item)"
@@ -188,10 +194,8 @@
 			</div>
 		</v-card>
 
-		<!-- Add/Edit Dialog -->
 		<v-dialog v-model="dialog" max-width="600px" persistent>
 			<v-card class="dialog-card" rounded="xl">
-				<!-- Dialog Header -->
 				<div class="dialog-header pa-6 pb-0">
 					<div class="d-flex align-center">
 						<div class="dialog-icon mr-4">
@@ -222,11 +226,9 @@
 					</div>
 				</div>
 
-				<!-- Dialog Content -->
 				<v-card-text class="pa-6">
 					<v-form ref="form" v-model="valid">
 						<div class="form-sections">
-							<!-- Basic Info Section -->
 							<div class="form-section mb-6">
 								<h4 class="section-title mb-4">
 									Thông tin cơ bản
@@ -282,7 +284,6 @@
 								</div>
 							</div>
 
-							<!-- Banking Info Section -->
 							<div class="form-section">
 								<h4 class="section-title mb-4">
 									Thông tin ngân hàng (Tùy chọn)
@@ -330,7 +331,6 @@
 					</v-form>
 				</v-card-text>
 
-				<!-- Dialog Actions -->
 				<v-card-actions class="pa-6 pt-0">
 					<v-spacer></v-spacer>
 					<v-btn
@@ -357,7 +357,217 @@
 			</v-card>
 		</v-dialog>
 
-		<!-- Delete Confirmation -->
+		<v-dialog v-model="debtDialog" max-width="800px" scrollable>
+			<v-card class="dialog-card" rounded="xl" v-if="debtSummary">
+				<div class="dialog-header pa-6 error-gradient">
+					<div class="d-flex align-center justify-space-between">
+						<div class="d-flex align-center">
+							<v-avatar
+								color="white"
+								size="48"
+								class="mr-4 elevation-2"
+							>
+								<span
+									class="text-error font-weight-bold text-xl"
+								>
+									{{
+										debtSummary.member_name
+											.charAt(0)
+											.toUpperCase()
+									}}
+								</span>
+							</v-avatar>
+							<div>
+								<h3 class="text-xl font-bold text-white">
+									Công nợ: {{ debtSummary.member_name }}
+								</h3>
+								<p class="text-white/90 text-sm">
+									Tổng số khoản nợ:
+									{{ debtSummary.debt_count }}
+								</p>
+							</div>
+						</div>
+						<div class="text-right">
+							<div class="text-white/80 text-sm">
+								Tổng phải trả
+							</div>
+							<div class="text-2xl font-bold text-white">
+								{{ formatCurrency(debtSummary.total_owed) }}
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<v-card-text class="pa-6" style="max-height: 70vh">
+					<div v-if="debtSummary.details.length > 0">
+						<div
+							v-for="detail in debtSummary.details"
+							:key="detail.payer_id"
+							class="mb-6"
+						>
+							<v-card
+								variant="outlined"
+								class="pa-4 payer-card"
+								rounded="lg"
+							>
+								<div
+									class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between mb-4"
+								>
+									<div
+										class="d-flex align-center mb-2 mb-sm-0"
+									>
+										<v-icon
+											color="primary"
+											class="mr-2"
+											size="24"
+											>mdi-account-cash</v-icon
+										>
+										<div>
+											<div
+												class="font-weight-bold text-lg"
+											>
+												Trả cho: {{ detail.payer_name }}
+											</div>
+											<div
+												class="text-caption text-surface-variant"
+												v-if="detail.bank_name"
+											>
+												{{ detail.bank_name }} -
+												{{ detail.account_number }}
+											</div>
+										</div>
+									</div>
+									<div class="d-flex align-center">
+										<v-btn
+											v-if="
+												detail.bank_name &&
+												detail.account_number
+											"
+											size="small"
+											variant="tonal"
+											color="primary"
+											class="mr-3"
+											rounded="lg"
+											@click="
+												showQuickQr(
+													detail,
+													debtSummary.member_name
+												)
+											"
+										>
+											<v-icon start>mdi-qrcode</v-icon>
+											Mã QR
+										</v-btn>
+
+										<v-chip
+											color="error"
+											variant="elevated"
+											rounded="lg"
+										>
+											Nợ:
+											{{
+												formatCurrency(
+													detail.total_owed_to_payer
+												)
+											}}
+										</v-chip>
+									</div>
+								</div>
+
+								<v-divider class="mb-3"></v-divider>
+
+								<div class="expense-list">
+									<div
+										v-for="expense in detail.expenses"
+										:key="expense.expense_id"
+										class="expense-item d-flex justify-space-between align-center py-2"
+									>
+										<div>
+											<div class="font-weight-medium">
+												{{ expense.expense_name }}
+											</div>
+											<div
+												class="text-caption text-surface-variant"
+											>
+												{{ formatDate(expense.date) }}
+											</div>
+										</div>
+										<div
+											class="font-weight-bold text-error"
+										>
+											{{ formatCurrency(expense.amount) }}
+										</div>
+									</div>
+								</div>
+							</v-card>
+						</div>
+					</div>
+					<div v-else class="text-center py-12">
+						<v-icon size="64" color="success" class="mb-4"
+							>mdi-check-circle-outline</v-icon
+						>
+						<h3 class="text-xl font-bold text-success">
+							Không có khoản nợ nào!
+						</h3>
+						<p class="text-surface-variant">
+							Thành viên này đã thanh toán đầy đủ.
+						</p>
+					</div>
+				</v-card-text>
+
+				<v-card-actions class="pa-6 pt-0">
+					<v-spacer></v-spacer>
+					<v-btn
+						color="primary"
+						variant="elevated"
+						@click="debtDialog = false"
+						rounded="lg"
+						block
+					>
+						Đóng
+					</v-btn>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
+
+		<v-dialog v-model="qrDialog" max-width="400px">
+			<v-card rounded="xl">
+				<v-card-title class="text-center pt-6 font-bold">
+					Quét mã thanh toán
+				</v-card-title>
+				<v-card-text class="text-center pa-6">
+					<div v-if="qrLoading" class="d-flex justify-center py-8">
+						<v-progress-circular
+							indeterminate
+							color="primary"
+						></v-progress-circular>
+					</div>
+					<img
+						v-show="!qrLoading"
+						:src="qrUrl"
+						class="w-100 rounded-lg border"
+						@load="qrLoading = false"
+						alt="VietQR"
+					/>
+					<div class="mt-4 text-body-2 text-surface-variant">
+						Số tiền: <strong>{{ qrAmount }}</strong>
+						<br />
+						Nội dung: {{ qrDesc }}
+					</div>
+				</v-card-text>
+				<v-card-actions class="pb-6 justify-center">
+					<v-btn
+						color="primary"
+						variant="tonal"
+						rounded="lg"
+						@click="qrDialog = false"
+					>
+						Đóng
+					</v-btn>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
+
 		<v-dialog v-model="deleteDialog" max-width="450px">
 			<v-card class="delete-dialog" rounded="xl">
 				<div class="delete-header pa-6 pb-0">
@@ -415,7 +625,6 @@
 			</v-card>
 		</v-dialog>
 
-		<!-- Success Snackbar -->
 		<v-snackbar
 			v-model="snackbar.show"
 			:color="snackbar.color"
@@ -444,11 +653,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
-import { membersApi } from "../services/api";
+import { membersApi, telegramApi } from "../services/api";
 
 const search = ref("");
 const dialog = ref(false);
 const deleteDialog = ref(false);
+const debtDialog = ref(false);
 const valid = ref(false);
 const loading = ref(false);
 const saving = ref(false);
@@ -456,6 +666,62 @@ const deleting = ref(false);
 const editedIndex = ref(-1);
 const members = ref([]);
 const memberToDelete = ref(null);
+const debtSummary = ref(null as any);
+
+// QR Logic
+const qrDialog = ref(false);
+const qrLoading = ref(false);
+const qrUrl = ref("");
+const qrAmount = ref("");
+const qrDesc = ref("");
+
+const showQuickQr = async (detail: any, debtorName: string) => {
+	if (!detail.bank_name || !detail.account_number) {
+		showNotification(
+			"Không có thông tin ngân hàng để tạo QR.",
+			"warning",
+			"mdi-alert-circle"
+		);
+		return;
+	}
+
+	qrLoading.value = true;
+	qrDialog.value = true;
+
+	const accountName = detail.payer_name;
+	const rawDescription = `${debtorName} tra ${accountName}`;
+
+	try {
+		// GỌI API BACKEND ĐỂ TẠO URL QR
+		const response = await telegramApi.generateQrCode({
+			bank_name: detail.bank_name,
+			account_number: detail.account_number,
+			amount: detail.total_owed_to_payer,
+			description: rawDescription,
+			account_name: accountName,
+		});
+
+		qrUrl.value = response.data.qr_url;
+		qrAmount.value = formatCurrency(detail.total_owed_to_payer);
+
+		// Cần phải decode URL để lấy nội dung đã được làm sạch từ BE
+		const urlParams = new URLSearchParams(
+			response.data.qr_url.split("?")[1]
+		);
+		const addInfo = urlParams.get("addInfo") || rawDescription;
+		qrDesc.value = decodeURIComponent(addInfo);
+	} catch (error) {
+		console.error("Error generating QR code:", error);
+		showNotification(
+			"Lỗi tạo mã QR. Vui lòng kiểm tra thông tin ngân hàng.",
+			"error",
+			"mdi-alert-circle"
+		);
+		qrDialog.value = false;
+	} finally {
+		qrLoading.value = false;
+	}
+};
 
 // Snackbar for notifications
 const snackbar = reactive({
@@ -526,7 +792,7 @@ const showNotification = (
 const fetchMembers = async () => {
 	loading.value = true;
 	try {
-		const response = await membersApi.getAll();
+		const response = await membersApi.getAll(search.value);
 		members.value = response.data;
 	} catch (error) {
 		console.error("Error fetching members:", error);
@@ -540,6 +806,15 @@ const fetchMembers = async () => {
 	}
 };
 
+// Debounce search input
+let searchTimeout: any = null;
+const handleSearch = (val: string) => {
+	if (searchTimeout) clearTimeout(searchTimeout);
+	searchTimeout = setTimeout(() => {
+		fetchMembers();
+	}, 500);
+};
+
 const openAddDialog = () => {
 	editedIndex.value = -1;
 	editedItem.value = { ...defaultItem };
@@ -550,6 +825,22 @@ const editMember = (member: any) => {
 	editedIndex.value = members.value.indexOf(member);
 	editedItem.value = { ...member };
 	dialog.value = true;
+};
+
+// New function: View Debt Summary
+const viewDebtSummary = async (member: any) => {
+	try {
+		const response = await membersApi.getDebtSummary(member.id);
+		debtSummary.value = response.data;
+		debtDialog.value = true;
+	} catch (error) {
+		console.error("Error fetching debt summary:", error);
+		showNotification(
+			"Có lỗi khi tải thông tin công nợ",
+			"error",
+			"mdi-alert-circle"
+		);
+	}
 };
 
 const deleteMember = (member: any) => {
@@ -609,6 +900,13 @@ const save = async () => {
 	} finally {
 		saving.value = false;
 	}
+};
+
+const formatCurrency = (amount: number) => {
+	return new Intl.NumberFormat("vi-VN", {
+		style: "currency",
+		currency: "VND",
+	}).format(amount);
 };
 
 const formatDate = (dateString: string) => {
@@ -864,6 +1162,24 @@ onMounted(fetchMembers);
 
 .modern-snackbar {
 	backdrop-filter: blur(10px);
+}
+
+/* Styles for Debt Summary Dialog */
+.error-gradient {
+	background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+}
+
+.payer-card {
+	border: 1px solid rgba(255, 107, 107, 0.2);
+	background: rgba(255, 255, 255, 0.5);
+}
+
+.expense-item {
+	border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.expense-item:last-child {
+	border-bottom: none;
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,4 @@
 import requests
-import tempfile
-import os
 from django.conf import settings
 from members.models import Member
 from expenses.models import ExpenseParticipant
@@ -17,6 +15,7 @@ class TelegramService:
         """Send debt reminder with QR codes"""
         try:
             member = Member.objects.get(id=member_id)
+            # Tối ưu N+1 query
             unpaid_participants = ExpenseParticipant.objects.filter(
                 member=member,
                 is_paid=False
@@ -30,87 +29,78 @@ class TelegramService:
 
             for participant in unpaid_participants:
                 payer = participant.expense.payer
+                # Bỏ qua nếu tự nợ chính mình
+                if payer.id == member.id:
+                    continue
+
                 grouped_by_payer[payer].append(participant)
                 total_debt += participant.amount_owed
 
-            overview_message = f"🔔 Nhắc nhở thanh toán\n\n"
-            overview_message += f"Chào {member.name}!\n\n"
-            overview_message += f"Bạn có {len(unpaid_participants)} khoản chưa thanh toán:\n"
-            overview_message += f"💰 Tổng cộng: {total_debt:,.0f} VND\n\n"
-            overview_message += f"Chi tiết thanh toán từng người 👇"
-
-            success = self._send_text_message(member.telegram_id, overview_message)
-            if not success:
+            if total_debt == 0:
                 return False
 
+            # Khởi tạo debtor_name an toàn
+            debtor_name = member.name or "Người nợ"
+
+            # Gửi tin nhắn tổng quan
+            overview_message = f"🔔 <b>NHẮC THANH TOÁN</b>\n"
+            overview_message += f"Chào {debtor_name}!\n"
+            overview_message += f"Bạn đang nợ tổng cộng: <b>{total_debt:,.0f} đ</b>\n"
+            overview_message += f"Chi tiết bên dưới 👇"
+
+            self._send_text_message(member.telegram_id, overview_message)
+
+            # Gửi chi tiết từng chủ nợ kèm QR
             for payer, participants in grouped_by_payer.items():
-                self._send_payer_details(member.telegram_id, member.name, payer, participants)
+                self._send_payer_details_with_qr(member.telegram_id, debtor_name, payer, participants)
 
             return True
 
+        except Member.DoesNotExist:
+            print(f"❌ [TELEGRAM SERVICE] Error: Member with ID {member_id} not found.")
+            return False
         except Exception as e:
+            # Lỗi "string index out of range" sẽ được catch ở đây
             print(f"❌ [TELEGRAM SERVICE] Error: {e}")
             return False
 
-    def _send_payer_details(self, chat_id, debtor_name, payer, participants):
+    def _send_payer_details_with_qr(self, chat_id, debtor_name, payer, participants):
         payer_total = sum(p.amount_owed for p in participants)
 
-        message = f"💰 Thanh toán cho {payer.name}\n"
-        message += f"Số tiền: {payer_total:,.0f} VND\n\n"
+        # Safeguard names from being empty/None
+        safe_debtor_name = debtor_name or "Người nợ"
+        safe_payer_name = payer.name or "Chủ nợ"
 
-        if payer.bank_name and payer.account_number:
-            message += f"🏦 Ngân hàng: {payer.bank_name}\n"
-            message += f"💳 Số TK: {payer.account_number}\n"
-            message += f"👤 Chủ TK: {payer.name}\n\n"
-        else:
-            message += f"⚠️ Chưa có thông tin STK, liên hệ {payer.name}\n\n"
+        # Tạo nội dung tin nhắn
+        message = f"👤 <b>Trả cho: {safe_payer_name}</b>\n"
+        message += f"💰 Số tiền: <b>{payer_total:,.0f} đ</b>\n"
 
-        message += f"📝 Chi tiết các khoản:\n"
-        for participant in participants:
-            message += f"• {participant.expense.name}: {participant.amount_owed:,.0f} VND\n"
-
+        # Chi tiết các món
         expense_names = [p.expense.name for p in participants]
-        description = f"{debtor_name} tra {payer.name}: {', '.join(expense_names[:2])}"
-        if len(expense_names) > 2:
-            description += f" va {len(expense_names)-2} mon khac"
+        message += f"📝 Khoản chi: {', '.join(expense_names)}\n"
 
-        message += f"\n💬 Nội dung CK: {description}"
+        # Tạo nội dung chuyển khoản: "TenTra no TenNhan"
+        description = f"{safe_debtor_name} tra {safe_payer_name}"
 
-        self._send_text_message(chat_id, message)
-
-        # if payer.bank_name and payer.account_number:
-        #     self._send_qr_code(chat_id, payer, payer_total, f"{debtor_name} ck")
-
-    def _send_qr_code(self, chat_id, payer, amount, description):
-        try:
-            qr_data = QRService.create_payment_qr_data(
+        # Tạo link QR
+        qr_url = None
+        if payer.bank_name and payer.account_number:
+            qr_url = QRService.get_vietqr_url(
                 bank_name=payer.bank_name,
                 account_number=payer.account_number,
-                account_name=payer.name,
-                amount=amount,
-                description=description
+                amount=payer_total,
+                description=description,
+                account_name=payer.name
             )
+            message += f"🏦 {payer.bank_name} - {payer.account_number}"
 
-            qr_base64 = QRService.create_qr_image_base64(qr_data)
-            if not qr_base64:
-                return False
-
-            import base64
-            qr_image_data = base64.b64decode(qr_base64.split(',')[1])
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
-                temp_file.write(qr_image_data)
-                temp_file_path = temp_file.name
-
-            success = self._send_photo_file(chat_id, temp_file_path, f"📱 QR thanh toán {payer.name}")
-
-            os.unlink(temp_file_path)
-
-            return success
-
-        except Exception as e:
-            print(f"Error creating/sending QR: {e}")
-            return False
+        # Gửi ảnh QR nếu có, nếu không thì gửi text
+        if qr_url:
+            # Gửi kèm ảnh (Telegram tự tải ảnh từ URL)
+            self._send_photo_url(chat_id, qr_url, message)
+        else:
+            message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
+            self._send_text_message(chat_id, message)
 
     def _send_text_message(self, chat_id, message):
         try:
@@ -122,21 +112,21 @@ class TelegramService:
             }
             response = requests.post(url, json=payload, timeout=10)
             return response.status_code == 200
-        except:
+        except Exception as e:
+            print(f"Error sending text: {e}")
             return False
 
-    def _send_photo_file(self, chat_id, file_path, caption=""):
+    def _send_photo_url(self, chat_id, photo_url, caption=""):
         try:
             url = f"{self.base_url}/sendPhoto"
-
-            with open(file_path, 'rb') as photo:
-                files = {'photo': photo}
-                data = {
-                    'chat_id': chat_id,
-                    'caption': caption
-                }
-                response = requests.post(url, files=files, data=data, timeout=15)
-                return response.status_code == 200
+            payload = {
+                'chat_id': chat_id,
+                'photo': photo_url,
+                'caption': caption,
+                'parse_mode': 'HTML'
+            }
+            response = requests.post(url, json=payload, timeout=15)
+            return response.status_code == 200
         except Exception as e:
-            print(f"Error sending photo file: {e}")
+            print(f"Error sending photo URL: {e}")
             return False
