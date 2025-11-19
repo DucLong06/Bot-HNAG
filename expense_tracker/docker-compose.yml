@@ -9,7 +9,7 @@ services:
         volumes:
             - ./frontend:/app
             - /app/node_modules
-            - frontend_dist:/app/dist
+            - ./frontend_dist_temp:/app/dist
         command: sh -c "npm install && npm run build"
         networks:
             - expense_network_prod
@@ -24,20 +24,15 @@ services:
             frontend_builder:
                 condition: service_completed_successfully
         volumes:
-            - frontend_dist:/app/frontend_dist
-            - static_volume:/app/staticfiles
-            - media_volume:/app/media
+            - ./frontend_dist_temp:/app/frontend_dist
+            - ./staticfiles_build:/app/staticfiles
+            - ./media_build:/app/media
         env_file:
             - .env
         ports:
             - "8000:8000"
         networks:
             - expense_network_prod
-
-volumes:
-    frontend_dist:
-    static_volume:
-    media_volume:
 
 networks:
     expense_network_prod:
