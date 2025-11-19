@@ -10,12 +10,14 @@ import json
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from django.conf import settings
-from django.views.static import serve  # ← ADD THIS IMPORT
-import os  # ← ADD THIS IMPORT
+from django.views.static import serve
+import os
+
 
 @ensure_csrf_cookie
 def get_csrf_token(request):
     return JsonResponse({'csrfToken': get_token(request)})
+
 
 @require_http_methods(["POST"])
 @ensure_csrf_cookie
@@ -35,9 +37,10 @@ def api_login(request):
                 'is_staff': user.is_staff,
                 'is_superuser': user.is_superuser,
             },
-            'sessionid': request.session.session_key  # Debug info
+            'sessionid': request.session.session_key
         })
     return JsonResponse({'error': 'Invalid credentials'}, status=400)
+
 
 @login_required
 def api_user(request):
@@ -46,9 +49,11 @@ def api_user(request):
         'is_staff': request.user.is_staff,
     })
 
+
 def api_logout(request):
     logout(request)
     return JsonResponse({'message': 'Logged out'})
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -61,20 +66,13 @@ urlpatterns = [
     path('api/telegram/', include('telegram_bot.urls')),
 ]
 
-urlpatterns += [
-    re_path(r'^assets/(?P<path>.*)$', serve, {
-        'document_root': os.path.join(settings.BASE_DIR, 'static', 'dist', 'assets'),
-    }),
-]
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
-    # Root path
-    path('', TemplateView.as_view(template_name='index.html'), name='home'),
-    re_path(r'^(?!api/|admin/|static/|media/|assets/).*/$',
+    re_path(r'^(?!api/|admin/|static/|media/).*$',
             TemplateView.as_view(template_name='index.html'),
             name='frontend'),
 ]

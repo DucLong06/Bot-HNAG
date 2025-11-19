@@ -5,6 +5,8 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    // [QUAN TRỌNG] Base url cho static files khi chạy qua Django
+    base: '/static/',
     plugins: [
         vue(),
         vuetify({
@@ -39,6 +41,10 @@ export default defineConfig({
         target: 'esnext',
         minify: 'esbuild',
         sourcemap: false,
+        // Output directory configuration
+        outDir: 'dist',
+        assetsDir: 'assets',
+        emptyOutDir: true,
         rollupOptions: {
             output: {
                 manualChunks: {

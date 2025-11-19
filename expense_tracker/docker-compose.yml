@@ -1,49 +1,44 @@
 version: "3.8"
+
 services:
-    postgres:
-        image: postgres:15
+    frontend_builder:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        container_name: expense_frontend_builder
         volumes:
-            - postgres_data:/var/lib/postgresql/data
-        environment:
-            - POSTGRES_DB=Ticketbooking
-            - POSTGRES_USER=admin
-            - POSTGRES_PASSWORD=123456
+            - ./frontend:/app
+            - /app/node_modules
+            - frontend_dist:/app/dist
+        command: sh -c "npm install && npm run build"
+        networks:
+            - expense_network_prod
 
     backend:
         build:
             context: ./backend
             dockerfile: Dockerfile
+        container_name: expense_backend
+        restart: always
+        depends_on:
+            frontend_builder:
+                condition: service_completed_successfully
         volumes:
-            - static_files:/app/staticfiles
-            - media_files:/app/media
+            - frontend_dist:/app/frontend_dist
+            - static_volume:/app/staticfiles
+            - media_volume:/app/media
         env_file:
             - .env
-
-    # Uncomment the following lines if you want to use Redis
-
-    frontend:
-        build:
-            context: ./frontend
-            dockerfile: Dockerfile
-        volumes:
-            - frontend_dist:/app/dist
-
-    nginx:
-        build:
-            context: .
-            dockerfile: nginx/Dockerfile
         ports:
-            - "80:80"
-        volumes:
-            - static_files:/app/staticfiles
-            - media_files:/app/media
-            - frontend_dist:/frontend
-        depends_on:
-            - backend
-            - frontend
+            - "8000:8000"
+        networks:
+            - expense_network_prod
 
 volumes:
-    postgres_data:
-    static_files:
-    media_files:
     frontend_dist:
+    static_volume:
+    media_volume:
+
+networks:
+    expense_network_prod:
+        external: true

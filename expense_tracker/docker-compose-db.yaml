@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+    postgres:
+        image: postgres:15-alpine
+        container_name: expense_db
+        restart: always
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB:-expense_tracker}
+            - POSTGRES_USER=${POSTGRES_USER:-admin}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-admin123}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - expense_network
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U admin -d expense_tracker"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+volumes:
+    postgres_data:
+
+networks:
+    expense_network:
+        name: expense_network_prod
