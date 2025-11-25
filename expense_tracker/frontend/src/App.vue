@@ -116,21 +116,41 @@
 								>
 									<template v-slot:prepend>
 										<v-avatar color="primary" size="36">
-											<v-icon color="white"
+											<v-icon
+												color="white"
+												v-if="!authStore.user?.username"
 												>mdi-account</v-icon
 											>
+											<span
+												v-else
+												class="text-white font-weight-bold"
+											>
+												{{
+													authStore.user.username
+														.charAt(0)
+														.toUpperCase()
+												}}
+											</span>
 										</v-avatar>
 									</template>
+
 									<v-list-item-title
 										class="font-weight-medium"
 									>
-										Admin User
+										{{
+											authStore.user?.username ||
+											"Người dùng"
+										}}
 									</v-list-item-title>
+
 									<v-list-item-subtitle class="text-caption">
-										Quản trị viên
+										{{
+											authStore.user?.is_superuser
+												? "Quản trị viên"
+												: "Thành viên"
+										}}
 									</v-list-item-subtitle>
 								</v-list-item>
-
 								<v-divider class="my-2"></v-divider>
 
 								<v-list-item

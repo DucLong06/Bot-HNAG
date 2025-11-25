@@ -42,13 +42,15 @@ def api_login(request):
     return JsonResponse({'error': 'Invalid credentials'}, status=400)
 
 
-@login_required
 def api_user(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'Authentication credentials were not provided.'}, status=401)
+        
     return JsonResponse({
         'username': request.user.username,
         'is_staff': request.user.is_staff,
+        'is_superuser': request.user.is_superuser,
     })
-
 
 def api_logout(request):
     logout(request)

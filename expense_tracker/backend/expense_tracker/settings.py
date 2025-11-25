@@ -7,10 +7,8 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
-# Chuyển đổi chuỗi 'True'/'False' thành boolean
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-# Cho phép tất cả các host trong môi trường dev/docker
 ALLOWED_HOSTS = ['*']
 
 # Whitenoise storage configuration
@@ -33,7 +31,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # [QUAN TRỌNG] Phục vụ static files
+    'whitenoise.middleware.WhiteNoiseMiddleware',  
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -44,7 +42,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'expense_tracker.urls'
 
-# [FIX] Đường dẫn tới thư mục build của VueJS (được mount từ Docker volume)
 FRONTEND_BUILD_DIR = os.path.join(BASE_DIR, 'frontend_dist')
 
 TEMPLATES = [
@@ -52,7 +49,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'templates',
-            FRONTEND_BUILD_DIR,  # [FIX] Thêm đường dẫn này để tìm thấy index.html
+            FRONTEND_BUILD_DIR, 
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -65,19 +62,17 @@ TEMPLATES = [
         },
     },
 ]
-
-# Cấu hình Database cho PostgreSQL
-# Sử dụng các biến môi trường được cung cấp bởi Docker Compose
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'expense_tracker'),
-        'USER': os.getenv('POSTGRES_USER', 'admin'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'admindoanxem'),
-        'HOST': os.getenv('POSTGRES_HOST', 'postgres'),  # Tên service trong docker-compose.db.yml
-        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+if not DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'expense_tracker'),
+            'USER': os.getenv('POSTGRES_USER', 'admin'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'admindoanxem'),
+            'HOST': os.getenv('POSTGRES_HOST', 'postgres'),  
+            'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        }
     }
-}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -99,7 +94,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
-    FRONTEND_BUILD_DIR,  # [FIX] Thêm thư mục build để collectstatic gom file assets
+    FRONTEND_BUILD_DIR, 
 ]
 
 MEDIA_URL = '/media/'
