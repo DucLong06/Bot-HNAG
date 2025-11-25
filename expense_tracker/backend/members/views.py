@@ -14,12 +14,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'telegram_id']
 
-    def get_permissions(self):
-        if self.action == 'list' or self.action == 'retrieve':
-            permission_classes = [permissions.AllowAny]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        return [permission() for permission in permission_classes]
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True, methods=['get'])
     def debt_summary(self, request, pk=None):
