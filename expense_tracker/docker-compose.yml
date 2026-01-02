@@ -34,22 +34,22 @@ services:
         networks:
             - expense_network_prod
 
-    nginx:
-        build:
-            context: ./nginx
-            dockerfile: dockerfile
+    # nginx:
+    #     build:
+    #         context: ./nginx
+    #         dockerfile: dockerfile
 
-        container_name: expense_nginx
-        restart: always
-        ports:
-            - "80:80"
-        volumes:
-            - ./staticfiles_build:/app/staticfiles
-            - ./media_build:/app/media
-        depends_on:
-            - backend
-        networks:
-            - expense_network_prod
+    #     container_name: expense_nginx
+    #     restart: always
+    #     ports:
+    #         - "80:80"
+    #     volumes:
+    #         - ./staticfiles_build:/app/staticfiles
+    #         - ./media_build:/app/media
+    #     depends_on:
+    #         - backend
+    #     networks:
+    #         - expense_network_prod
 
 networks:
     expense_network_prod:
