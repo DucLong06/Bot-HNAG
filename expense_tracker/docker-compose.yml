@@ -19,6 +19,8 @@ services:
             context: ./backend
             dockerfile: Dockerfile
         container_name: expense_backend
+        ports:
+            - "8000:8000"
         restart: always
         depends_on:
             frontend_builder:
