@@ -139,7 +139,8 @@ class TelegramService:
             self._send_photo_url(chat_id, qr_url, message, reply_markup=keyboard)
         else:
             message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
-            self._send_text_message(chat_id, message)
+            # Send message with keyboard even without QR code
+            self._send_text_message_with_keyboard(chat_id, message, keyboard)
 
     def _send_text_message(self, chat_id, message):
         try:
@@ -192,41 +193,46 @@ class TelegramService:
         from telegram_bot.models import TelegramUpdateOffset
         from django.db import transaction
 
+        # Fetch current offset (quick transaction)
         with transaction.atomic():
-            # Lock offset row to prevent concurrent polling
             offset_obj = TelegramUpdateOffset.objects.select_for_update().get_or_create(pk=1)[0]
-            offset = offset_obj.offset + 1
+            current_offset = offset_obj.offset
 
-            try:
-                url = f"{self.base_url}/getUpdates"
-                response = requests.post(
-                    url,
-                    json={"offset": offset, "timeout": timeout},
-                    timeout=timeout + 5  # Add 5s buffer
-                )
+        # HTTP request outside transaction to avoid holding DB lock
+        try:
+            url = f"{self.base_url}/getUpdates"
+            response = requests.post(
+                url,
+                json={"offset": current_offset + 1, "timeout": timeout},
+                timeout=timeout + 5  # Add 5s buffer
+            )
 
-                if response.status_code == 200:
-                    data = response.json()
-                    updates = data.get("result", [])
+            if response.status_code == 200:
+                data = response.json()
+                updates = data.get("result", [])
 
-                    # Update offset after successful fetch
-                    if updates:
-                        max_update_id = max(u["update_id"] for u in updates)
-                        offset_obj.offset = max_update_id
-                        offset_obj.save()
+                # Update offset in separate transaction after successful fetch
+                if updates:
+                    max_update_id = max(u["update_id"] for u in updates)
+                    with transaction.atomic():
+                        offset_obj = TelegramUpdateOffset.objects.select_for_update().get_or_create(pk=1)[0]
+                        # Only update if no newer offset written (handle concurrent updates)
+                        if max_update_id > offset_obj.offset:
+                            offset_obj.offset = max_update_id
+                            offset_obj.save()
 
-                    return updates
-                else:
-                    error_code = response.json().get("error_code", "unknown") if response.text else "unknown"
-                    print(f"❌ [TELEGRAM] getUpdates failed: code={error_code}")
-                    return []
-
-            except requests.Timeout:
-                # Normal for long polling - return empty
+                return updates
+            else:
+                error_code = response.json().get("error_code", "unknown") if response.text else "unknown"
+                print(f"❌ [TELEGRAM] getUpdates failed: code={error_code}")
                 return []
-            except Exception as e:
-                print(f"❌ [TELEGRAM] Error polling updates: {type(e).__name__}")
-                return []
+
+        except requests.Timeout:
+            # Normal for long polling - return empty
+            return []
+        except Exception as e:
+            print(f"❌ [TELEGRAM] Error polling updates: {type(e).__name__}")
+            return []
 
     def send_message_with_keyboard(self, chat_id, text, inline_keyboard):
         """
@@ -341,4 +347,31 @@ class TelegramService:
 
         except Exception as e:
             print(f"⚠️ [TELEGRAM] Error editing message: {type(e).__name__}")
+            return False
+
+    def _send_text_message_with_keyboard(self, chat_id, message, keyboard):
+        """
+        Send text message with inline keyboard.
+        Used when QR code not available but still want to show button.
+
+        Args:
+            chat_id: Telegram chat ID
+            message: Message text (supports HTML)
+            keyboard: Inline keyboard dict (same format as send_message_with_keyboard)
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            url = f"{self.base_url}/sendMessage"
+            payload = {
+                'chat_id': chat_id,
+                'text': message,
+                'parse_mode': 'HTML',
+                'reply_markup': keyboard
+            }
+            response = requests.post(url, json=payload, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Error sending text with keyboard: {e}")
             return False
