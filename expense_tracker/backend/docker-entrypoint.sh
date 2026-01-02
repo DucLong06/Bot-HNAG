@@ -8,11 +8,12 @@ python manage.py migrate --noinput
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
-echo "Starting server with Gunicorn..."
+echo "Starting services with Supervisor..."
+echo "  - Gunicorn (Django web server)"
+echo "  - Telegram Polling (payment confirmation bot)"
 
-exec gunicorn expense_tracker.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 3 \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile -
+# Create log directory for supervisor
+mkdir -p /var/log/supervisor
+
+# Start supervisor (runs both gunicorn and telegram polling)
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
