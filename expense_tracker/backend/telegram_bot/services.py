@@ -94,10 +94,49 @@ class TelegramService:
             )
             message += f"🏦 {payer.bank_name} - {payer.account_number}"
 
+        # Create inline keyboard with payment confirmation button
+        debtor_id = participants[0].member.id  # Get debtor ID from first participant
+
+        # Validate IDs before creating callback_data
+        if not isinstance(debtor_id, int) or not isinstance(payer.id, int):
+            print(f"⚠️ [TELEGRAM] Invalid ID types: debtor={type(debtor_id)}, payer={type(payer.id)}")
+            # Fallback: send message without button
+            if qr_url:
+                self._send_photo_url(chat_id, qr_url, message)
+            else:
+                message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
+                self._send_text_message(chat_id, message)
+            return
+
+        # SECURITY NOTE: callback_data contains debtor_id and payer_id
+        # Phase 02 handler MUST validate that callback_query.from.id matches debtor.telegram_id
+        # to prevent impersonation attacks
+        callback_data = f"initiate_payment:{debtor_id}:{payer.id}"
+
+        # Validate callback_data length (Telegram limit: 64 bytes)
+        if len(callback_data.encode('utf-8')) > 64:
+            print(f"⚠️ [TELEGRAM] Callback data exceeds 64 bytes: {len(callback_data)} bytes")
+            # Fallback: send message without button
+            if qr_url:
+                self._send_photo_url(chat_id, qr_url, message)
+            else:
+                message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
+                self._send_text_message(chat_id, message)
+            return
+
+        keyboard = {
+            "inline_keyboard": [[
+                {
+                    "text": "✅ Tôi đã trả tiền này",
+                    "callback_data": callback_data
+                }
+            ]]
+        }
+
         # Gửi ảnh QR nếu có, nếu không thì gửi text
         if qr_url:
-            # Gửi kèm ảnh (Telegram tự tải ảnh từ URL)
-            self._send_photo_url(chat_id, qr_url, message)
+            # Gửi kèm ảnh (Telegram tự tải ảnh từ URL) với inline button
+            self._send_photo_url(chat_id, qr_url, message, reply_markup=keyboard)
         else:
             message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
             self._send_text_message(chat_id, message)
@@ -116,7 +155,7 @@ class TelegramService:
             print(f"Error sending text: {e}")
             return False
 
-    def _send_photo_url(self, chat_id, photo_url, caption=""):
+    def _send_photo_url(self, chat_id, photo_url, caption="", reply_markup=None):
         try:
             url = f"{self.base_url}/sendPhoto"
             payload = {
@@ -125,8 +164,181 @@ class TelegramService:
                 'caption': caption,
                 'parse_mode': 'HTML'
             }
+
+            # Add reply_markup if provided (for inline keyboards)
+            if reply_markup:
+                payload['reply_markup'] = reply_markup
+
             response = requests.post(url, json=payload, timeout=15)
             return response.status_code == 200
         except Exception as e:
             print(f"Error sending photo URL: {e}")
+            return False
+
+    def get_telegram_updates(self, timeout=30):
+        """
+        Poll Telegram API for new updates.
+        Uses stored offset to prevent duplicate processing.
+
+        WARNING: Only ONE instance of polling loop should run at a time.
+        Use cron locking mechanism or ensure single process to prevent race conditions.
+
+        Args:
+            timeout: Long polling timeout in seconds (default: 30)
+
+        Returns:
+            list: Update objects from Telegram API
+        """
+        from telegram_bot.models import TelegramUpdateOffset
+        from django.db import transaction
+
+        with transaction.atomic():
+            # Lock offset row to prevent concurrent polling
+            offset_obj = TelegramUpdateOffset.objects.select_for_update().get_or_create(pk=1)[0]
+            offset = offset_obj.offset + 1
+
+            try:
+                url = f"{self.base_url}/getUpdates"
+                response = requests.post(
+                    url,
+                    json={"offset": offset, "timeout": timeout},
+                    timeout=timeout + 5  # Add 5s buffer
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    updates = data.get("result", [])
+
+                    # Update offset after successful fetch
+                    if updates:
+                        max_update_id = max(u["update_id"] for u in updates)
+                        offset_obj.offset = max_update_id
+                        offset_obj.save()
+
+                    return updates
+                else:
+                    error_code = response.json().get("error_code", "unknown") if response.text else "unknown"
+                    print(f"❌ [TELEGRAM] getUpdates failed: code={error_code}")
+                    return []
+
+            except requests.Timeout:
+                # Normal for long polling - return empty
+                return []
+            except Exception as e:
+                print(f"❌ [TELEGRAM] Error polling updates: {type(e).__name__}")
+                return []
+
+    def send_message_with_keyboard(self, chat_id, text, inline_keyboard):
+        """
+        Send message with inline keyboard buttons.
+
+        Args:
+            chat_id: Telegram chat ID
+            text: Message text (supports HTML)
+            inline_keyboard: List of button rows, e.g.,
+                [[{"text": "✅ Confirm", "callback_data": "confirm_123"}]]
+
+        Returns:
+            dict: Response containing message_id if successful, else None
+        """
+        url = f"{self.base_url}/sendMessage"
+
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": inline_keyboard}
+        }
+
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+
+            if response.status_code == 200:
+                return response.json().get("result")
+            else:
+                # Sanitize error message to prevent token/data leakage
+                try:
+                    error_data = response.json()
+                    error_code = error_data.get("error_code", "unknown")
+                    error_desc = error_data.get("description", "")[:50]  # Truncate
+                    print(f"❌ [TELEGRAM] Send keyboard failed: code={error_code}, desc={error_desc}")
+                except:
+                    print(f"❌ [TELEGRAM] Send keyboard failed: status={response.status_code}")
+                return None
+
+        except Exception as e:
+            print(f"❌ [TELEGRAM] Error sending keyboard: {type(e).__name__}")
+            return None
+
+    def answer_callback_query(self, callback_query_id, text=None, show_alert=False):
+        """
+        Answer callback query to remove loading spinner.
+        MUST be called after receiving callback_query.
+
+        Args:
+            callback_query_id: ID from callback_query object
+            text: Optional notification text (appears as toast or alert)
+            show_alert: If True, shows alert popup instead of toast
+
+        Returns:
+            bool: Success status
+        """
+        url = f"{self.base_url}/answerCallbackQuery"
+
+        payload = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+            payload["show_alert"] = show_alert
+
+        try:
+            # Increased timeout to 10s for poor network conditions
+            response = requests.post(url, json=payload, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            print(f"❌ [TELEGRAM] Error answering callback: {type(e).__name__}")
+            return False
+
+    def edit_message_text(self, chat_id, message_id, new_text, reply_markup=None):
+        """
+        Edit existing message text and buttons.
+
+        Args:
+            chat_id: Telegram chat ID
+            message_id: ID of message to edit
+            new_text: New message text
+            reply_markup: New inline_keyboard (use None to remove buttons)
+
+        Returns:
+            bool: Success status
+        """
+        url = f"{self.base_url}/editMessageText"
+
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": new_text,
+            "parse_mode": "HTML"
+        }
+
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+
+            if response.status_code == 200:
+                return True
+            else:
+                # Non-critical error (message might be deleted by user)
+                # Sanitize error message
+                try:
+                    error_data = response.json()
+                    error_desc = error_data.get("description", "")[:50]
+                    print(f"⚠️ [TELEGRAM] Edit failed (non-critical): {error_desc}")
+                except:
+                    print(f"⚠️ [TELEGRAM] Edit failed: status={response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"⚠️ [TELEGRAM] Error editing message: {type(e).__name__}")
             return False

@@ -1,2 +1,5 @@
 frontend_dist_temp/
 staticfiles_build/
+plans/
+docs/
+.claude/

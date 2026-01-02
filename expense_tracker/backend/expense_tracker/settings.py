@@ -69,7 +69,7 @@ if not DEBUG:
             'NAME': os.getenv('POSTGRES_DB', 'expense_tracker'),
             'USER': os.getenv('POSTGRES_USER', 'admin'),
             'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'admindoanxem'),
-            'HOST': os.getenv('POSTGRES_HOST', 'postgres'),  
+            'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
             'PORT': os.getenv('POSTGRES_PORT', '5432'),
         }
     }
