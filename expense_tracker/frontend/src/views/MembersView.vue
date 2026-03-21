@@ -194,7 +194,170 @@
 			</div>
 		</v-card>
 
-		<v-dialog v-model="dialog" max-width="600px" persistent>
+		<!-- Member Groups Section -->
+	<v-card class="members-card mt-6" rounded="xl" elevation="0">
+		<div class="card-header pa-6 pb-0">
+			<div class="d-flex align-center justify-space-between">
+				<div class="card-title-section">
+					<h2 class="card-title text-xl font-bold d-flex align-center">
+						<v-icon class="mr-3" color="secondary">mdi-account-group</v-icon>
+						Nhóm thành viên
+					</h2>
+					<p class="card-subtitle text-sm">{{ groups.length }} nhóm đã tạo</p>
+				</div>
+				<v-btn
+					color="secondary"
+					@click="openGroupDialog()"
+					size="small"
+					rounded="lg"
+					variant="tonal"
+				>
+					<v-icon size="18" class="mr-1">mdi-plus</v-icon>
+					Thêm nhóm
+				</v-btn>
+			</div>
+		</div>
+
+		<div class="pa-6 pt-4">
+			<div v-if="groupsLoading" class="d-flex justify-center py-8">
+				<v-progress-circular indeterminate color="secondary"></v-progress-circular>
+			</div>
+			<div v-else-if="groups.length === 0" class="text-center py-8 text-surface-variant">
+				<v-icon size="48" class="mb-3">mdi-account-group-outline</v-icon>
+				<p>Chưa có nhóm nào. Tạo nhóm để quản lý chi tiêu theo tập thể.</p>
+			</div>
+			<div v-else class="d-flex flex-wrap gap-3">
+				<v-card
+					v-for="group in groups"
+					:key="group.id"
+					variant="outlined"
+					rounded="lg"
+					class="pa-4"
+					style="min-width: 220px; max-width: 320px; flex: 1"
+				>
+					<div class="d-flex align-center justify-space-between mb-2">
+						<div class="font-weight-bold text-base">{{ group.name }}</div>
+						<div>
+							<v-btn icon size="x-small" variant="text" color="orange" @click="openGroupDialog(group)">
+								<v-icon size="16">mdi-pencil</v-icon>
+							</v-btn>
+							<v-btn icon size="x-small" variant="text" color="error" @click="openGroupDeleteDialog(group)">
+								<v-icon size="16">mdi-delete</v-icon>
+							</v-btn>
+						</div>
+					</div>
+					<div class="d-flex flex-wrap gap-1">
+						<v-chip
+							v-for="member in group.members"
+							:key="member.id"
+							size="x-small"
+							color="primary"
+							variant="tonal"
+							rounded="lg"
+						>{{ member.name }}</v-chip>
+						<span v-if="group.members.length === 0" class="text-caption text-surface-variant">Chưa có thành viên</span>
+					</div>
+					<div class="text-caption text-surface-variant mt-2">{{ group.members.length }} thành viên</div>
+				</v-card>
+			</div>
+		</div>
+	</v-card>
+
+	<!-- Group Add/Edit Dialog -->
+	<v-dialog v-model="groupDialog" max-width="500px" persistent>
+		<v-card class="dialog-card" rounded="xl">
+			<div class="dialog-header pa-6 pb-0">
+				<div class="d-flex align-center">
+					<div class="dialog-icon mr-4">
+						<v-icon size="24" color="white">{{ editedGroup.id ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
+					</div>
+					<div>
+						<h3 class="dialog-title text-xl font-bold">
+							{{ editedGroup.id ? 'Sửa nhóm' : 'Thêm nhóm mới' }}
+						</h3>
+					</div>
+				</div>
+			</div>
+			<v-card-text class="pa-6">
+				<div class="form-group mb-4">
+					<label class="form-label">Tên nhóm *</label>
+					<v-text-field
+						v-model="editedGroup.name"
+						variant="outlined"
+						hide-details="auto"
+						rounded="lg"
+						:rules="[(v) => !!v || 'Tên nhóm là bắt buộc']"
+					>
+						<template v-slot:prepend-inner>
+							<v-icon color="secondary">mdi-account-group</v-icon>
+						</template>
+					</v-text-field>
+				</div>
+				<div class="form-group">
+					<label class="form-label">Thành viên</label>
+					<v-autocomplete
+						v-model="editedGroup.member_ids"
+						:items="members"
+						item-title="name"
+						item-value="id"
+						variant="outlined"
+						rounded="lg"
+						multiple
+						chips
+						closable-chips
+						hide-details
+						label="Chọn thành viên..."
+						clearable
+					>
+						<template v-slot:prepend-inner>
+							<v-icon color="primary">mdi-account-multiple</v-icon>
+						</template>
+					</v-autocomplete>
+				</div>
+			</v-card-text>
+			<v-card-actions class="pa-6 pt-0">
+				<v-spacer></v-spacer>
+				<v-btn color="surface-variant" variant="outlined" @click="closeGroupDialog" rounded="lg" class="mr-3">
+					<v-icon size="18" class="mr-2">mdi-close</v-icon>Hủy
+				</v-btn>
+				<v-btn color="secondary" @click="saveGroup" :loading="groupSaving" :disabled="!editedGroup.name" rounded="lg">
+					<v-icon size="18" class="mr-2">mdi-check</v-icon>Lưu
+				</v-btn>
+			</v-card-actions>
+		</v-card>
+	</v-dialog>
+
+	<!-- Group Delete Dialog -->
+	<v-dialog v-model="groupDeleteDialog" max-width="420px">
+		<v-card class="delete-dialog" rounded="xl">
+			<div class="delete-header pa-6 pb-0">
+				<div class="d-flex align-center">
+					<div class="delete-icon mr-4">
+						<v-icon size="24" color="white">mdi-delete</v-icon>
+					</div>
+					<h3 class="delete-title text-xl font-bold text-white">Xác nhận xóa nhóm</h3>
+				</div>
+			</div>
+			<v-card-text class="pa-6">
+				<p class="delete-message mb-4">
+					Bạn có chắc muốn xóa nhóm <strong>{{ groupToDelete?.name }}</strong>?
+				</p>
+				<v-alert type="warning" variant="tonal" rounded="lg">
+					<template v-slot:prepend><v-icon>mdi-alert-triangle</v-icon></template>
+					Hành động này không thể hoàn tác!
+				</v-alert>
+			</v-card-text>
+			<v-card-actions class="pa-6 pt-0">
+				<v-spacer></v-spacer>
+				<v-btn color="surface-variant" variant="outlined" @click="groupDeleteDialog = false" rounded="lg" class="mr-3">Hủy</v-btn>
+				<v-btn color="error" @click="confirmGroupDelete" :loading="groupDeleting" rounded="lg">
+					<v-icon size="18" class="mr-2">mdi-delete</v-icon>Xóa
+				</v-btn>
+			</v-card-actions>
+		</v-card>
+	</v-dialog>
+
+	<v-dialog v-model="dialog" max-width="600px" persistent>
 			<v-card class="dialog-card" rounded="xl">
 				<div class="dialog-header pa-6 pb-0">
 					<div class="d-flex align-center">
@@ -652,8 +815,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
-import { membersApi, telegramApi } from "../services/api";
+import { ref, reactive, computed, onMounted } from "vue";
+import { membersApi, groupsApi, telegramApi } from "../services/api";
+import { useAuthStore } from "../stores/auth";
+
+const authStore = useAuthStore();
+const isStaff = computed(() => authStore.user?.is_staff ?? false);
 
 const search = ref("");
 const dialog = ref(false);
@@ -701,15 +868,9 @@ const showQuickQr = async (detail: any, debtorName: string) => {
 			account_name: accountName,
 		});
 
-		qrUrl.value = response.data.qr_url;
+		qrUrl.value = response.data.qr_image;
 		qrAmount.value = formatCurrency(detail.total_owed_to_payer);
-
-		// Cần phải decode URL để lấy nội dung đã được làm sạch từ BE
-		const urlParams = new URLSearchParams(
-			response.data.qr_url.split("?")[1]
-		);
-		const addInfo = urlParams.get("addInfo") || rawDescription;
-		qrDesc.value = decodeURIComponent(addInfo);
+		qrDesc.value = rawDescription;
 	} catch (error) {
 		console.error("Error generating QR code:", error);
 		showNotification(
@@ -754,14 +915,19 @@ const bankOptions = [
 	"Bac A Bank",
 ];
 
-const headers = [
-	{ title: "Thành viên", key: "name", width: "25%" },
-	{ title: "Telegram ID", key: "telegram_id", width: "20%" },
-	{ title: "Ngân hàng", key: "bank_name", width: "15%" },
-	{ title: "Số TK", key: "account_number", width: "15%" },
-	{ title: "Ngày tạo", key: "created_at", width: "15%" },
-	{ title: "Hành động", key: "actions", sortable: false, width: "10%" },
-];
+const headers = computed(() => {
+	const base = [
+		{ title: "Thành viên", key: "name", width: "25%" },
+		{ title: "Ngân hàng", key: "bank_name", width: "15%" },
+		{ title: "Số TK", key: "account_number", width: "15%" },
+		{ title: "Ngày tạo", key: "created_at", width: "15%" },
+		{ title: "Hành động", key: "actions", sortable: false, width: "10%" },
+	];
+	if (isStaff.value) {
+		base.splice(1, 0, { title: "Telegram ID", key: "telegram_id", width: "20%" });
+	}
+	return base;
+});
 
 const editedItem = ref({
 	name: "",
@@ -890,13 +1056,22 @@ const save = async () => {
 		}
 		await fetchMembers();
 		close();
-	} catch (error) {
+	} catch (error: any) {
 		console.error("Error saving member:", error);
-		showNotification(
-			"Có lỗi khi lưu thông tin thành viên",
-			"error",
-			"mdi-alert-circle"
-		);
+		const data = error?.response?.data;
+		if (data?.telegram_id) {
+			showNotification(
+				`Telegram ID: ${data.telegram_id[0]}`,
+				"error",
+				"mdi-alert-circle"
+			);
+		} else {
+			showNotification(
+				"Có lỗi khi lưu thông tin thành viên",
+				"error",
+				"mdi-alert-circle"
+			);
+		}
 	} finally {
 		saving.value = false;
 	}
@@ -920,7 +1095,94 @@ const formatTime = (dateString: string) => {
 	});
 };
 
-onMounted(fetchMembers);
+// --- Groups ---
+const groups = ref<any[]>([]);
+const groupsLoading = ref(false);
+const groupDialog = ref(false);
+const groupDeleteDialog = ref(false);
+const groupSaving = ref(false);
+const groupDeleting = ref(false);
+const groupToDelete = ref<any>(null);
+
+const defaultGroup = { id: null, name: '', member_ids: [] as number[] };
+const editedGroup = ref({ ...defaultGroup });
+
+const fetchGroups = async () => {
+	groupsLoading.value = true;
+	try {
+		const res = await groupsApi.getAll();
+		groups.value = res.data;
+	} catch (e) {
+		showNotification('Có lỗi khi tải danh sách nhóm', 'error', 'mdi-alert-circle');
+	} finally {
+		groupsLoading.value = false;
+	}
+};
+
+const openGroupDialog = (group?: any) => {
+	if (group) {
+		editedGroup.value = {
+			id: group.id,
+			name: group.name,
+			member_ids: group.members.map((m: any) => m.id),
+		};
+	} else {
+		editedGroup.value = { ...defaultGroup, member_ids: [] };
+	}
+	groupDialog.value = true;
+};
+
+const closeGroupDialog = () => {
+	groupDialog.value = false;
+	editedGroup.value = { ...defaultGroup, member_ids: [] };
+};
+
+const saveGroup = async () => {
+	if (!editedGroup.value.name) return;
+	groupSaving.value = true;
+	try {
+		const payload = { name: editedGroup.value.name, member_ids: editedGroup.value.member_ids };
+		if (editedGroup.value.id) {
+			await groupsApi.update(editedGroup.value.id, payload);
+			showNotification('Cập nhật nhóm thành công');
+		} else {
+			await groupsApi.create(payload);
+			showNotification('Thêm nhóm mới thành công');
+		}
+		await fetchGroups();
+		closeGroupDialog();
+	} catch (e) {
+		showNotification('Có lỗi khi lưu nhóm', 'error', 'mdi-alert-circle');
+	} finally {
+		groupSaving.value = false;
+	}
+};
+
+const openGroupDeleteDialog = (group: any) => {
+	groupToDelete.value = group;
+	groupDeleteDialog.value = true;
+};
+
+const confirmGroupDelete = async () => {
+	if (!groupToDelete.value) return;
+	groupDeleting.value = true;
+	try {
+		await groupsApi.delete(groupToDelete.value.id);
+		await fetchGroups();
+		groupDeleteDialog.value = false;
+		showNotification(`Đã xóa nhóm ${groupToDelete.value.name}`);
+		groupToDelete.value = null;
+	} catch (e) {
+		showNotification('Có lỗi khi xóa nhóm', 'error', 'mdi-alert-circle');
+	} finally {
+		groupDeleting.value = false;
+	}
+};
+
+onMounted(() => {
+	fetchMembers();
+	fetchGroups();
+});
 </script>
 
 <style scoped>

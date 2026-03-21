@@ -79,6 +79,14 @@ export const expensesApi = {
         api.post(`/expenses/${id}/mark_paid/`, { participant_id: participantId })
 }
 
+export const groupsApi = {
+    getAll: () => api.get('/members/groups/'),
+    get: (id: number) => api.get(`/members/groups/${id}/`),
+    create: (data: any) => api.post('/members/groups/', data),
+    update: (id: number, data: any) => api.put(`/members/groups/${id}/`, data),
+    delete: (id: number) => api.delete(`/members/groups/${id}/`),
+}
+
 export const telegramApi = {
     sendReminder: (memberId: number) =>
         api.post('/telegram/send-reminder/', { member_id: memberId }),

@@ -441,32 +441,68 @@
 										color="success"
 										variant="outlined"
 										rounded="lg"
-										class="mr-2"
 									>
-										<v-icon size="16" class="mr-1"
-											>mdi-calculator</v-icon
-										>
+										<v-icon size="16" class="mr-1">mdi-calculator</v-icon>
 										Chia đều
-									</v-btn>
-									<v-btn
-										@click="addParticipant"
-										color="primary"
-										size="small"
-										rounded="lg"
-									>
-										<v-icon size="16" class="mr-1"
-											>mdi-plus</v-icon
-										>
-										Thêm người
 									</v-btn>
 								</div>
 							</div>
+
+							<!-- Group quick-add -->
+							<v-autocomplete
+								v-model="selectedGroupIds"
+								:items="groups"
+								item-title="name"
+								item-value="id"
+								multiple
+								chips
+								closable-chips
+								clearable
+								label="Chọn nhóm"
+								density="compact"
+								variant="outlined"
+								rounded="lg"
+								hide-details
+								prepend-inner-icon="mdi-account-group"
+								@update:model-value="onGroupsChanged"
+							/>
+
+							<!-- Individual member selection -->
+							<v-autocomplete
+								v-model="selectedMemberIds"
+								:items="members"
+								item-title="name"
+								item-value="id"
+								multiple
+								chips
+								closable-chips
+								clearable
+								label="Chọn thành viên"
+								density="compact"
+								variant="outlined"
+								rounded="lg"
+								hide-details
+								class="mt-3"
+								prepend-inner-icon="mdi-account-plus"
+							/>
+
+							<!-- Duplicate warning -->
+							<v-alert
+								v-if="duplicateCount > 0"
+								type="warning"
+								density="compact"
+								class="mt-2"
+								rounded="lg"
+								variant="tonal"
+							>
+								{{ duplicateCount }} người trùng lặp từ các nhóm, chỉ tính 1 lần
+							</v-alert>
 
 							<v-expand-transition>
 								<v-alert
 									v-if="totalError"
 									type="error"
-									class="mb-4"
+									class="mt-3"
 									rounded="lg"
 									border="start"
 									variant="tonal"
@@ -480,13 +516,9 @@
 										</div>
 										<div class="text-sm mt-1">
 											Tổng tiền người tham gia ({{
-												formatCurrency(
-													participantTotal
-												)
+												formatCurrency(participantTotal)
 											}}) phải bằng tổng số tiền ({{
-												formatCurrency(
-													editedItem.total_amount
-												)
+												formatCurrency(editedItem.total_amount)
 											}})
 										</div>
 									</div>
@@ -495,117 +527,67 @@
 
 							<div
 								v-if="editedItem.participant_data.length === 0"
-								class="empty-participants text-center py-8"
+								class="empty-participants text-center py-8 mt-3"
 							>
-								<v-icon size="48" color="surface-variant"
-									>mdi-account-plus</v-icon
-								>
+								<v-icon size="48" color="surface-variant">mdi-account-plus</v-icon>
 								<p class="text-surface-variant mt-2">
 									Chưa có người tham gia nào
 								</p>
 							</div>
 
-							<div v-else class="participants-list">
-								<div
-									v-for="(
-										participant, index
-									) in editedItem.participant_data"
-									:key="index"
-									class="participant-item mb-3"
-								>
-									<v-card
-										variant="outlined"
-										class="pa-4"
-										rounded="lg"
+							<!-- Compact amount table -->
+							<v-table
+								v-else
+								density="compact"
+								class="mt-4 participants-table"
+							>
+								<thead>
+									<tr>
+										<th>Thành viên</th>
+										<th>Số tiền (VND)</th>
+										<th>Trạng thái</th>
+										<th></th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr
+										v-for="(p, i) in editedItem.participant_data"
+										:key="i"
 									>
-										<v-row align="center">
-											<v-col cols="12" md="4">
-												<div class="form-group">
-													<label
-														class="form-label-small"
-														>Thành viên</label
-													>
-													<v-select
-														v-model="
-															participant.member_id
-														"
-														:items="members"
-														item-title="name"
-														item-value="id"
-														variant="outlined"
-														density="compact"
-														hide-details
-														rounded="lg"
-													></v-select>
-												</div>
-											</v-col>
-											<v-col cols="12" md="3">
-												<div class="form-group">
-													<label
-														class="form-label-small"
-														>Số tiền (VND)</label
-													>
-													<v-text-field
-														v-model.number="
-															participant.amount_owed
-														"
-														type="number"
-														variant="outlined"
-														density="compact"
-														hide-details
-														rounded="lg"
-													></v-text-field>
-												</div>
-											</v-col>
-											<v-col cols="12" md="3">
-												<div class="form-group">
-													<label
-														class="form-label-small"
-														>Trạng thái</label
-													>
-													<div class="pt-2">
-														<v-switch
-															v-model="
-																participant.is_paid
-															"
-															color="success"
-															:label="
-																participant.is_paid
-																	? 'Đã trả'
-																	: 'Chưa trả'
-															"
-															hide-details
-															density="compact"
-														></v-switch>
-													</div>
-												</div>
-											</v-col>
-											<v-col cols="12" md="2">
-												<div
-													class="d-flex justify-center"
-												>
-													<v-btn
-														@click="
-															removeParticipant(
-																index
-															)
-														"
-														icon
-														size="small"
-														color="error"
-														variant="outlined"
-														rounded="lg"
-													>
-														<v-icon size="18"
-															>mdi-delete</v-icon
-														>
-													</v-btn>
-												</div>
-											</v-col>
-										</v-row>
-									</v-card>
-								</div>
-							</div>
+										<td class="font-weight-medium">
+											{{ getMemberName(p.member_id) }}
+										</td>
+										<td>
+											<v-text-field
+												v-model.number="p.amount_owed"
+												type="number"
+												variant="outlined"
+												density="compact"
+												hide-details
+												style="max-width: 150px"
+											/>
+										</td>
+										<td>
+											<v-switch
+												v-model="p.is_paid"
+												color="success"
+												:label="p.is_paid ? 'Đã trả' : 'Chưa trả'"
+												hide-details
+												density="compact"
+											/>
+										</td>
+										<td>
+											<v-btn
+												icon="mdi-close"
+												size="small"
+												variant="text"
+												color="error"
+												@click="removeParticipantById(p.member_id)"
+											/>
+										</td>
+									</tr>
+								</tbody>
+							</v-table>
 						</div>
 					</v-form>
 				</v-card-text>
@@ -667,8 +649,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from "vue";
-import { expensesApi, membersApi } from "../services/api";
+import { ref, computed, reactive, watch, onMounted } from "vue";
+import { expensesApi, membersApi, groupsApi } from "../services/api";
 
 const dialog = ref(false);
 const valid = ref(false);
@@ -676,6 +658,10 @@ const saving = ref(false);
 const editedIndex = ref(-1);
 const expenses = ref([]);
 const members = ref([]);
+const groups = ref<any[]>([]);
+const selectedGroupIds = ref<number[]>([]);
+const selectedMemberIds = ref<number[]>([]);
+const duplicateCount = ref(0);
 
 // Filters
 const search = ref("");
@@ -792,6 +778,9 @@ const getStatusText = (expense: any) => {
 const openAddDialog = () => {
 	editedIndex.value = -1;
 	editedItem.value = { ...defaultItem, participant_data: [] };
+	selectedGroupIds.value = [];
+	selectedMemberIds.value = [];
+	duplicateCount.value = 0;
 	dialog.value = true;
 };
 
@@ -806,6 +795,9 @@ const editExpense = (expense: any) => {
 			is_paid: p.is_paid,
 		})),
 	};
+	selectedMemberIds.value = expense.participants.map((p: any) => p.member.id);
+	selectedGroupIds.value = [];
+	duplicateCount.value = 0;
 	dialog.value = true;
 };
 
@@ -826,16 +818,72 @@ const deleteExpense = async (expense: any) => {
 	}
 };
 
-const addParticipant = () => {
-	editedItem.value.participant_data.push({
-		member_id: null,
-		amount_owed: 0,
-		is_paid: false,
-	});
+const fetchGroups = async () => {
+	try {
+		const response = await groupsApi.getAll();
+		groups.value = response.data;
+	} catch (e) {
+		console.error("Error fetching groups:", e);
+	}
 };
 
-const removeParticipant = (index: number) => {
-	editedItem.value.participant_data.splice(index, 1);
+const syncParticipants = () => {
+	const allMemberIds = new Set<number>();
+	let totalFromGroups = 0;
+
+	for (const groupId of selectedGroupIds.value) {
+		const group = groups.value.find((g: any) => g.id === groupId);
+		if (group) {
+			for (const member of group.members) {
+				totalFromGroups++;
+				allMemberIds.add(member.id);
+			}
+		}
+	}
+
+	for (const memberId of selectedMemberIds.value) {
+		allMemberIds.add(memberId);
+	}
+
+	duplicateCount.value =
+		totalFromGroups + selectedMemberIds.value.length - allMemberIds.size;
+
+	const existingAmounts = new Map(
+		editedItem.value.participant_data.map((p: any) => [
+			p.member_id,
+			{ amount_owed: p.amount_owed, is_paid: p.is_paid },
+		])
+	);
+
+	editedItem.value.participant_data = Array.from(allMemberIds).map((id) => ({
+		member_id: id,
+		amount_owed: existingAmounts.get(id)?.amount_owed || 0,
+		is_paid: existingAmounts.get(id)?.is_paid || false,
+	}));
+};
+
+const onGroupsChanged = () => {
+	syncParticipants();
+};
+
+watch(selectedMemberIds, () => {
+	syncParticipants();
+});
+
+const getMemberName = (memberId: number) => {
+	const member = members.value.find((m: any) => m.id === memberId);
+	return (member as any)?.name || "Unknown";
+};
+
+const removeParticipantById = (memberId: number) => {
+	editedItem.value.participant_data = editedItem.value.participant_data.filter(
+		(p: any) => p.member_id !== memberId
+	);
+	selectedMemberIds.value = selectedMemberIds.value.filter(
+		(id) => id !== memberId
+	);
+	// Also remove from group selections if they came from a group
+	// We only remove from individual list; group members stay unless group deselected
 };
 
 const distributeEvenly = () => {
@@ -853,6 +901,9 @@ const close = () => {
 	dialog.value = false;
 	editedItem.value = { ...defaultItem };
 	editedIndex.value = -1;
+	selectedGroupIds.value = [];
+	selectedMemberIds.value = [];
+	duplicateCount.value = 0;
 };
 
 const save = async () => {
@@ -891,6 +942,7 @@ const formatDate = (dateString: string) => {
 onMounted(() => {
 	fetchExpenses();
 	fetchMembers();
+	fetchGroups();
 });
 </script>
 
@@ -1152,14 +1204,6 @@ onMounted(() => {
 	font-size: 0.875rem;
 }
 
-.form-label-small {
-	display: block;
-	font-weight: 500;
-	color: rgb(55, 65, 81);
-	margin-bottom: 0.25rem;
-	font-size: 0.75rem;
-}
-
 .alert-content {
 	display: flex;
 	flex-direction: column;
@@ -1172,13 +1216,10 @@ onMounted(() => {
 	background: rgba(248, 250, 252, 0.5);
 }
 
-.participants-list {
-	max-height: 300px;
-	overflow-y: auto;
-}
-
-.participant-item {
-	position: relative;
+.participants-table {
+	border-radius: 8px;
+	overflow: hidden;
+	border: 1px solid rgba(102, 126, 234, 0.15);
 }
 
 .modern-snackbar {
@@ -1284,12 +1325,12 @@ onMounted(() => {
 	}
 }
 
-/* Scrollbar for participants list */
-.participants-list::-webkit-scrollbar {
+/* Scrollbar for participants table */
+.participants-table::-webkit-scrollbar {
 	width: 6px;
 }
 
-.participants-list::-webkit-scrollbar-thumb {
+.participants-table::-webkit-scrollbar-thumb {
 	background: rgba(102, 126, 234, 0.3);
 	border-radius: 3px;
 }

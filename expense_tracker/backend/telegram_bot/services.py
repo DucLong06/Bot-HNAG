@@ -1,3 +1,5 @@
+import io
+import json
 import requests
 from django.conf import settings
 from members.models import Member
@@ -71,28 +73,52 @@ class TelegramService:
         safe_debtor_name = debtor_name or "Người nợ"
         safe_payer_name = payer.name or "Chủ nợ"
 
-        # Tạo nội dung tin nhắn
-        message = f"👤 <b>Trả cho: {safe_payer_name}</b>\n"
-        message += f"💰 Số tiền: <b>{payer_total:,.0f} đ</b>\n"
+        # Header: payer name and total
+        message = f"👤 <b>Trả cho: {safe_payer_name}</b> — <b>{payer_total:,.0f} đ</b>\n\n"
 
-        # Chi tiết các món
-        expense_names = [p.expense.name for p in participants]
-        message += f"📝 Khoản chi: {', '.join(expense_names)}\n"
+        # Expense details with dates
+        message += "📝 <b>Chi tiết:</b>\n"
+        for p in participants:
+            date_str = p.expense.created_at.strftime('%d/%m')
+            message += f"  • {p.expense.name} ({date_str}) — {p.amount_owed:,.0f} đ\n"
+
+        # Paid/unpaid breakdown across all these expenses
+        expense_ids = [p.expense.id for p in participants]
+        all_participants_in_expenses = ExpenseParticipant.objects.filter(
+            expense_id__in=expense_ids
+        ).select_related('member', 'expense')
+
+        paid_members = set()
+        unpaid_members = set()
+        total_participants_count = set()
+
+        for ep in all_participants_in_expenses:
+            total_participants_count.add(ep.member.name)
+            if ep.is_paid:
+                paid_members.add(ep.member.name)
+            else:
+                unpaid_members.add(ep.member.name)
+
+        message += "\n"
+        if paid_members:
+            message += f"✅ Đã trả ({len(paid_members)}/{len(total_participants_count)}): {', '.join(sorted(paid_members))}\n"
+        if unpaid_members:
+            message += f"❌ Chưa trả: {', '.join(sorted(unpaid_members))}\n"
 
         # Tạo nội dung chuyển khoản: "TenTra no TenNhan"
         description = f"{safe_debtor_name} tra {safe_payer_name}"
 
-        # Tạo link QR
-        qr_url = None
+        # Tạo QR bytes cục bộ
+        qr_bytes = None
         if payer.bank_name and payer.account_number:
-            qr_url = QRService.get_vietqr_url(
+            qr_bytes = QRService.generate_qr_image(
                 bank_name=payer.bank_name,
                 account_number=payer.account_number,
                 amount=payer_total,
                 description=description,
                 account_name=payer.name
             )
-            message += f"🏦 {payer.bank_name} - {payer.account_number}"
+            message += f"\n🏦 {payer.bank_name} - {payer.account_number}"
 
         # Create inline keyboard with payment confirmation button
         debtor_id = participants[0].member.id  # Get debtor ID from first participant
@@ -101,8 +127,8 @@ class TelegramService:
         if not isinstance(debtor_id, int) or not isinstance(payer.id, int):
             print(f"⚠️ [TELEGRAM] Invalid ID types: debtor={type(debtor_id)}, payer={type(payer.id)}")
             # Fallback: send message without button
-            if qr_url:
-                self._send_photo_url(chat_id, qr_url, message)
+            if qr_bytes:
+                self._send_photo_bytes(chat_id, qr_bytes, message)
             else:
                 message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
                 self._send_text_message(chat_id, message)
@@ -117,8 +143,8 @@ class TelegramService:
         if len(callback_data.encode('utf-8')) > 64:
             print(f"⚠️ [TELEGRAM] Callback data exceeds 64 bytes: {len(callback_data)} bytes")
             # Fallback: send message without button
-            if qr_url:
-                self._send_photo_url(chat_id, qr_url, message)
+            if qr_bytes:
+                self._send_photo_bytes(chat_id, qr_bytes, message)
             else:
                 message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
                 self._send_text_message(chat_id, message)
@@ -134,12 +160,14 @@ class TelegramService:
         }
 
         # Gửi ảnh QR nếu có, nếu không thì gửi text
-        if qr_url:
-            # Gửi kèm ảnh (Telegram tự tải ảnh từ URL) với inline button
-            self._send_photo_url(chat_id, qr_url, message, reply_markup=keyboard)
+        # If message exceeds photo caption limit (1024 chars), send text first then QR separately
+        if qr_bytes and len(message) > 1024:
+            self._send_text_message(chat_id, message)
+            self._send_photo_bytes(chat_id, qr_bytes, caption="", reply_markup=keyboard)
+        elif qr_bytes:
+            self._send_photo_bytes(chat_id, qr_bytes, message, reply_markup=keyboard)
         else:
             message += "\n⚠️ <i>Chưa có thông tin ngân hàng để tạo QR</i>"
-            # Send message with keyboard even without QR code
             self._send_text_message_with_keyboard(chat_id, message, keyboard)
 
     def _send_text_message(self, chat_id, message):
@@ -174,6 +202,24 @@ class TelegramService:
             return response.status_code == 200
         except Exception as e:
             print(f"Error sending photo URL: {e}")
+            return False
+
+    def _send_photo_bytes(self, chat_id, photo_bytes, caption="", reply_markup=None):
+        """Send photo from bytes using multipart upload"""
+        try:
+            url = f"{self.base_url}/sendPhoto"
+            files = {'photo': ('qr.png', io.BytesIO(photo_bytes), 'image/png')}
+            data = {
+                'chat_id': chat_id,
+                'caption': caption,
+                'parse_mode': 'HTML'
+            }
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
+            response = requests.post(url, data=data, files=files, timeout=15)
+            return response.status_code == 200
+        except Exception as e:
+            print(f"Error sending photo bytes: {e}")
             return False
 
     def get_telegram_updates(self, timeout=30):

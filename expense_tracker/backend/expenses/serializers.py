@@ -48,7 +48,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
             ExpenseParticipant.objects.create(
                 expense=expense,
                 member_id=participant['member_id'],
-                amount_owed=participant['amount_owed']
+                amount_owed=participant['amount_owed'],
+                is_paid=participant.get('is_paid', False)
             )
 
         return expense

@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
+router.register(r'groups', views.MemberGroupViewSet)
 router.register(r'', views.MemberViewSet)
 
 urlpatterns = [

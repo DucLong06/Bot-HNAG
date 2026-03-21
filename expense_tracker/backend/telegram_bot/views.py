@@ -1,3 +1,4 @@
+import base64
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,7 +26,7 @@ def send_debt_reminder(request):
             return Response({'error': 'Failed to send reminder or no unpaid expenses'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print(f"Error in send_debt_reminder view: {e}")
-        return Response({'error': f'Failed to send reminder: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': 'Failed to send reminder'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -57,7 +58,7 @@ def send_bulk_reminders(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_qr_code(request):
-    """API để tạo VietQR Quick Link URL (Tập trung logic ở BE)"""
+    """API để tạo VietQR QR code PNG (local EMV generation)"""
     bank_name = request.data.get('bank_name')
     account_number = request.data.get('account_number')
     amount = request.data.get('amount')
@@ -65,11 +66,13 @@ def generate_qr_code(request):
     account_name = request.data.get('account_name')
 
     if not bank_name or not account_number or not amount:
-        return Response({'error': 'bank_name, account_number, and amount are required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'bank_name, account_number, and amount are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
-        # Gọi hàm tạo URL đã được định nghĩa trong QRService
-        qr_url = QRService.get_vietqr_url(
+        qr_bytes = QRService.generate_qr_image(
             bank_name=bank_name,
             account_number=account_number,
             amount=amount,
@@ -77,11 +80,20 @@ def generate_qr_code(request):
             account_name=account_name
         )
 
-        if qr_url:
-            return Response({'qr_url': qr_url})
+        if qr_bytes:
+            qr_base64 = base64.b64encode(qr_bytes).decode('utf-8')
+            return Response({
+                'qr_image': f'data:image/png;base64,{qr_base64}'
+            })
         else:
-            return Response({'error': 'Could not generate QR code. Check bank details.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Could not generate QR code. Check bank name is supported.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     except Exception as e:
         print(f"Error in generate_qr_code view: {e}")
-        return Response({'error': f'Failed to generate QR: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'error': 'Failed to generate QR code'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
