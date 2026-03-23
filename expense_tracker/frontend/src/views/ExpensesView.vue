@@ -862,13 +862,14 @@ const syncParticipants = () => {
 		allMemberIds.add(memberId);
 	}
 
-	// Remove manually excluded members
+	// Calculate duplicates BEFORE filtering exclusions (exclusions aren't duplicates)
+	duplicateCount.value =
+		totalFromGroups + selectedMemberIds.value.length - allMemberIds.size;
+
+	// Remove manually excluded members (after duplicate calc)
 	for (const excludedId of excludedMemberIds.value) {
 		allMemberIds.delete(excludedId);
 	}
-
-	duplicateCount.value =
-		totalFromGroups + selectedMemberIds.value.length - allMemberIds.size;
 
 	const existingAmounts = new Map(
 		editedItem.value.participant_data.map((p: any) => [
@@ -890,7 +891,14 @@ const onGroupsChanged = () => {
 	syncParticipants();
 };
 
-watch(selectedMemberIds, () => {
+watch(selectedMemberIds, (newIds, oldIds) => {
+	// Un-exclude members that were re-added via individual selector
+	const added = newIds.filter((id) => !(oldIds || []).includes(id));
+	if (added.length > 0) {
+		excludedMemberIds.value = excludedMemberIds.value.filter(
+			(id) => !added.includes(id)
+		);
+	}
 	syncParticipants();
 });
 
