@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum, F
@@ -82,3 +82,21 @@ class MemberGroupViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.created_by and instance.created_by != request.user and not request.user.is_superuser:
+            return Response(
+                {'error': 'Bạn không có quyền sửa nhóm này (chỉ người tạo mới được sửa)'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.created_by and instance.created_by != request.user and not request.user.is_superuser:
+            return Response(
+                {'error': 'Bạn không có quyền xóa nhóm này'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)

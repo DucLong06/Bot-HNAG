@@ -237,7 +237,7 @@
 				>
 					<div class="d-flex align-center justify-space-between mb-2">
 						<div class="font-weight-bold text-base">{{ group.name }}</div>
-						<div>
+						<div v-if="group.is_owner">
 							<v-btn icon size="x-small" variant="text" color="orange" @click="openGroupDialog(group)">
 								<v-icon size="16">mdi-pencil</v-icon>
 							</v-btn>
@@ -257,7 +257,10 @@
 						>{{ member.name }}</v-chip>
 						<span v-if="group.members.length === 0" class="text-caption text-surface-variant">Chưa có thành viên</span>
 					</div>
-					<div class="text-caption text-surface-variant mt-2">{{ group.members.length }} thành viên</div>
+					<div class="d-flex justify-space-between text-caption text-surface-variant mt-2">
+						<span>{{ group.members.length }} thành viên</span>
+						<span v-if="group.created_by_name">Tạo bởi: {{ group.created_by_name }}</span>
+					</div>
 				</v-card>
 			</div>
 		</div>
@@ -1151,8 +1154,9 @@ const saveGroup = async () => {
 		}
 		await fetchGroups();
 		closeGroupDialog();
-	} catch (e) {
-		showNotification('Có lỗi khi lưu nhóm', 'error', 'mdi-alert-circle');
+	} catch (e: any) {
+		const msg = e?.response?.data?.error || 'Có lỗi khi lưu nhóm';
+		showNotification(msg, 'error', 'mdi-alert-circle');
 	} finally {
 		groupSaving.value = false;
 	}
@@ -1172,8 +1176,9 @@ const confirmGroupDelete = async () => {
 		groupDeleteDialog.value = false;
 		showNotification(`Đã xóa nhóm ${groupToDelete.value.name}`);
 		groupToDelete.value = null;
-	} catch (e) {
-		showNotification('Có lỗi khi xóa nhóm', 'error', 'mdi-alert-circle');
+	} catch (e: any) {
+		const msg = e?.response?.data?.error || 'Có lỗi khi xóa nhóm';
+		showNotification(msg, 'error', 'mdi-alert-circle');
 	} finally {
 		groupDeleting.value = false;
 	}

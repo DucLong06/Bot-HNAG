@@ -498,6 +498,20 @@
 								{{ duplicateCount }} người trùng lặp từ các nhóm, chỉ tính 1 lần
 							</v-alert>
 
+							<!-- Excluded members summary per group -->
+							<v-alert
+								v-if="groupExclusionSummary.length > 0"
+								type="info"
+								density="compact"
+								class="mt-2"
+								rounded="lg"
+								variant="tonal"
+							>
+								<div v-for="(item, idx) in groupExclusionSummary" :key="idx">
+									{{ item.groupName }} − {{ item.memberNames.join(', ') }}
+								</div>
+							</v-alert>
+
 							<v-expand-transition>
 								<v-alert
 									v-if="totalError"
@@ -661,6 +675,7 @@ const members = ref([]);
 const groups = ref<any[]>([]);
 const selectedGroupIds = ref<number[]>([]);
 const selectedMemberIds = ref<number[]>([]);
+const excludedMemberIds = ref<number[]>([]);
 const duplicateCount = ref(0);
 
 // Filters
@@ -780,6 +795,7 @@ const openAddDialog = () => {
 	editedItem.value = { ...defaultItem, participant_data: [] };
 	selectedGroupIds.value = [];
 	selectedMemberIds.value = [];
+	excludedMemberIds.value = [];
 	duplicateCount.value = 0;
 	dialog.value = true;
 };
@@ -797,6 +813,7 @@ const editExpense = (expense: any) => {
 	};
 	selectedMemberIds.value = expense.participants.map((p: any) => p.member.id);
 	selectedGroupIds.value = [];
+	excludedMemberIds.value = [];
 	duplicateCount.value = 0;
 	dialog.value = true;
 };
@@ -845,6 +862,11 @@ const syncParticipants = () => {
 		allMemberIds.add(memberId);
 	}
 
+	// Remove manually excluded members
+	for (const excludedId of excludedMemberIds.value) {
+		allMemberIds.delete(excludedId);
+	}
+
 	duplicateCount.value =
 		totalFromGroups + selectedMemberIds.value.length - allMemberIds.size;
 
@@ -863,11 +885,30 @@ const syncParticipants = () => {
 };
 
 const onGroupsChanged = () => {
+	// Clear exclusions when groups change so re-selected groups bring all members
+	excludedMemberIds.value = [];
 	syncParticipants();
 };
 
 watch(selectedMemberIds, () => {
 	syncParticipants();
+});
+
+// Build per-group exclusion summary, e.g. "Nhóm A − Nguyễn Văn X, Trần Y"
+const groupExclusionSummary = computed(() => {
+	if (excludedMemberIds.value.length === 0) return [];
+	const result: { groupName: string; memberNames: string[] }[] = [];
+	for (const groupId of selectedGroupIds.value) {
+		const group = groups.value.find((g: any) => g.id === groupId);
+		if (!group) continue;
+		const excluded = group.members
+			.filter((m: any) => excludedMemberIds.value.includes(m.id))
+			.map((m: any) => m.name);
+		if (excluded.length > 0) {
+			result.push({ groupName: group.name, memberNames: excluded });
+		}
+	}
+	return result;
 });
 
 const getMemberName = (memberId: number) => {
@@ -876,14 +917,16 @@ const getMemberName = (memberId: number) => {
 };
 
 const removeParticipantById = (memberId: number) => {
+	// Track excluded members so syncParticipants won't re-add them
+	if (!excludedMemberIds.value.includes(memberId)) {
+		excludedMemberIds.value.push(memberId);
+	}
 	editedItem.value.participant_data = editedItem.value.participant_data.filter(
 		(p: any) => p.member_id !== memberId
 	);
 	selectedMemberIds.value = selectedMemberIds.value.filter(
 		(id) => id !== memberId
 	);
-	// Also remove from group selections if they came from a group
-	// We only remove from individual list; group members stay unless group deselected
 };
 
 const distributeEvenly = () => {
@@ -903,6 +946,7 @@ const close = () => {
 	editedIndex.value = -1;
 	selectedGroupIds.value = [];
 	selectedMemberIds.value = [];
+	excludedMemberIds.value = [];
 	duplicateCount.value = 0;
 };
 
