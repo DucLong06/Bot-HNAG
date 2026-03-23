@@ -409,7 +409,7 @@
 									</v-avatar>
 									<v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="triggerAvatarInput">
 										<v-icon size="16" class="mr-1">mdi-camera</v-icon>
-										Doi anh dai dien
+										Đổi ảnh đại diện
 									</v-btn>
 									<input ref="avatarInput" type="file" accept="image/*" class="d-none" @change="onAvatarSelected" />
 								</div>
