@@ -12,36 +12,12 @@
 				<h1 class="hero-title text-5xl font-bold mb-3">Hôm Nay Ăn Gì</h1>
 				<p class="hero-subtitle text-xl mb-6">Thống kê chi tiêu nhóm vui vẻ</p>
 
-				<!-- Overview Stats -->
-				<div v-if="stats" class="quick-stats mb-4">
-					<v-row justify="center" dense>
-						<v-col cols="auto">
-							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
-								<div class="stats-number text-2xl font-bold text-primary">
-									{{ formatCurrency(stats.overview.total_spending) }}
-								</div>
-								<div class="stats-label text-sm">Tổng chi tiêu</div>
-							</v-card>
-						</v-col>
-						<v-col cols="auto">
-							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
-								<div class="stats-number text-2xl font-bold text-secondary">{{ stats.overview.total_expenses }}</div>
-								<div class="stats-label text-sm">Khoản chi</div>
-							</v-card>
-						</v-col>
-						<v-col cols="auto">
-							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
-								<div class="stats-number text-2xl font-bold text-success">{{ stats.overview.total_paid }}</div>
-								<div class="stats-label text-sm">Đã trả</div>
-							</v-card>
-						</v-col>
-						<v-col cols="auto">
-							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
-								<div class="stats-number text-2xl font-bold text-error">{{ stats.overview.total_unpaid }}</div>
-								<div class="stats-label text-sm">Chưa trả</div>
-							</v-card>
-						</v-col>
-					</v-row>
+				<!-- Total Spending -->
+				<div v-if="stats" class="hero-total mb-2">
+					<div class="text-h3 font-weight-bold text-primary">
+						{{ formatCurrency(stats.overview.total_spending) }}
+					</div>
+					<div class="text-sm text-medium-emphasis mt-1">Tổng chi tiêu</div>
 				</div>
 			</div>
 		</div>
@@ -220,6 +196,7 @@ const leaderboardCards = computed(() => {
 	if (!stats.value) return [];
 	const lb = stats.value.leaderboards;
 	return [
+		// Row 1: Money leaders
 		{
 			key: "top_spenders",
 			title: "Đại gia",
@@ -262,6 +239,50 @@ const leaderboardCards = computed(() => {
 			subtitle: (item: any) => `${item.count} lần bao`,
 			valueDisplay: (item: any) => formatCurrency(item.total),
 		},
+		// Row 2: Eating frequency
+		{
+			key: "most_frequent_eaters",
+			title: "Ăn nhiều nhất",
+			icon: "mdi-food-drumstick",
+			color: "deep-purple",
+			accentClass: "accent-deep-purple",
+			avatarBg: "deep-purple-lighten-4",
+			fallbackIcon: "mdi-food-drumstick",
+			valueColor: "text-deep-purple",
+			items: lb.most_frequent_eaters || [],
+			top: lb.most_frequent_eaters?.[0] || null,
+			subtitle: (item: any) => `${item.meal_count} lần đi ăn`,
+			valueDisplay: (item: any) => formatCurrency(item.total_eaten),
+		},
+		{
+			key: "rarest_eaters",
+			title: "Ma ẩn",
+			icon: "mdi-ghost",
+			color: "blue-grey",
+			accentClass: "accent-grey",
+			avatarBg: "blue-grey-lighten-4",
+			fallbackIcon: "mdi-ghost",
+			valueColor: "text-blue-grey",
+			items: lb.rarest_eaters || [],
+			top: lb.rarest_eaters?.[0] || null,
+			subtitle: (item: any) => `Chỉ ${item.meal_count} lần đi ăn`,
+			valueDisplay: (item: any) => formatCurrency(item.total_eaten),
+		},
+		{
+			key: "top_freeloaders",
+			title: "Được bao nhiều nhất",
+			icon: "mdi-party-popper",
+			color: "pink",
+			accentClass: "accent-pink",
+			avatarBg: "pink-lighten-4",
+			fallbackIcon: "mdi-party-popper",
+			valueColor: "text-pink",
+			items: lb.top_freeloaders || [],
+			top: lb.top_freeloaders?.[0] || null,
+			subtitle: (item: any) => `${item.treat_count} lần được bao`,
+			valueDisplay: (item: any) => formatCurrency(item.total_treated),
+		},
+		// Row 3: Records
 		{
 			key: "longest_debts",
 			title: "Nợ lâu nhất",
@@ -292,7 +313,7 @@ const leaderboardCards = computed(() => {
 		},
 		{
 			key: "cleanest_members",
-			title: "Sạch nợ nhất",
+			title: "Trả nợ chăm nhất",
 			icon: "mdi-star",
 			color: "teal",
 			accentClass: "accent-teal",
@@ -301,8 +322,8 @@ const leaderboardCards = computed(() => {
 			valueColor: "text-teal",
 			items: lb.cleanest_members || [],
 			top: lb.cleanest_members?.[0] || null,
-			subtitle: () => "Chỉ nợ có",
-			valueDisplay: (item: any) => formatCurrency(item.total_owed),
+			subtitle: (item: any) => `Đã trả ${item.paid_count} khoản`,
+			valueDisplay: (item: any) => formatCurrency(item.total_paid),
 		},
 	].filter((c) => c.top);
 });
@@ -405,12 +426,7 @@ onMounted(fetchStats);
 }
 .hero-subtitle { color: rgb(107, 114, 128); }
 
-.stats-card {
-	background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px);
-	border: 1px solid rgba(102, 126, 234, 0.1); transition: transform 0.2s ease; min-width: 110px;
-}
-.stats-card:hover { transform: translateY(-2px); }
-.stats-label { color: rgb(107, 114, 128); font-weight: 500; }
+.hero-total { margin-top: -0.5rem; }
 .section-header { text-align: left; }
 
 /* Leaderboard cards */
@@ -428,6 +444,9 @@ onMounted(fetchStats);
 .accent-purple { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
 .accent-orange { background: linear-gradient(90deg, #f97316, #fb923c); }
 .accent-teal { background: linear-gradient(90deg, #14b8a6, #2dd4bf); }
+.accent-deep-purple { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+.accent-grey { background: linear-gradient(90deg, #6b7280, #9ca3af); }
+.accent-pink { background: linear-gradient(90deg, #ec4899, #f472b6); }
 
 /* Ranking dialog */
 .ranking-header { background: rgba(255, 255, 255, 0.95); }

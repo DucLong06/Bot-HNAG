@@ -21,11 +21,7 @@ def public_stats(request):
     participants = ExpenseParticipant.objects.all()
 
     # --- Overview stats ---
-    total_expenses = expenses.count()
     total_spending = expenses.aggregate(total=Sum('total_amount'))['total'] or 0
-    total_members = Member.objects.count()
-    total_paid = participants.filter(is_paid=True).count()
-    total_unpaid = participants.filter(is_paid=False).count()
 
     # Build avatar URL helper
     def avatar_url(avatar_path):
@@ -109,18 +105,56 @@ def public_stats(request):
             'date': e.created_at,
         })
 
-    # Cleanest members (least total debt among those who have unpaid debt)
+    # Cleanest members — those who have paid off the most debts (excluding self-debt)
     cleanest_members = list(
-        participants.filter(is_paid=False)
+        participants.filter(is_paid=True)
         .exclude(member=F('expense__payer'))
         .values('member__id', 'member__name', 'member__avatar')
-        .annotate(total_owed=Sum('amount_owed'))
-        .order_by('total_owed')[:RANKING_LIMIT]
+        .annotate(paid_count=Count('id'), total_paid=Sum('amount_owed'))
+        .order_by('-paid_count')[:RANKING_LIMIT]
     )
     for item in cleanest_members:
         item['avatar'] = avatar_url(item.pop('member__avatar'))
         item['name'] = item.pop('member__name')
-        item['total_owed'] = float(item['total_owed'])
+        item['total_paid'] = float(item['total_paid'])
+        del item['member__id']
+
+    # Most frequent eaters (appears on the most bills)
+    most_frequent_eaters = list(
+        participants.values('member__id', 'member__name', 'member__avatar')
+        .annotate(meal_count=Count('id'), total_eaten=Sum('amount_owed'))
+        .order_by('-meal_count')[:RANKING_LIMIT]
+    )
+    for item in most_frequent_eaters:
+        item['avatar'] = avatar_url(item.pop('member__avatar'))
+        item['name'] = item.pop('member__name')
+        item['total_eaten'] = float(item['total_eaten'])
+        del item['member__id']
+
+    # Rarest eaters (appears on the fewest bills) — "Ma ẩn"
+    rarest_eaters = list(
+        participants.values('member__id', 'member__name', 'member__avatar')
+        .annotate(meal_count=Count('id'), total_eaten=Sum('amount_owed'))
+        .order_by('meal_count')[:RANKING_LIMIT]
+    )
+    for item in rarest_eaters:
+        item['avatar'] = avatar_url(item.pop('member__avatar'))
+        item['name'] = item.pop('member__name')
+        item['total_eaten'] = float(item['total_eaten'])
+        del item['member__id']
+
+    # Top freeloaders (got treated the most — participated where someone else paid, debt cleared)
+    top_freeloaders = list(
+        participants.filter(is_paid=True)
+        .exclude(member=F('expense__payer'))
+        .values('member__id', 'member__name', 'member__avatar')
+        .annotate(treat_count=Count('id'), total_treated=Sum('amount_owed'))
+        .order_by('-treat_count')[:RANKING_LIMIT]
+    )
+    for item in top_freeloaders:
+        item['avatar'] = avatar_url(item.pop('member__avatar'))
+        item['name'] = item.pop('member__name')
+        item['total_treated'] = float(item['total_treated'])
         del item['member__id']
 
     # --- Charts data ---
@@ -141,16 +175,15 @@ def public_stats(request):
 
     return Response({
         'overview': {
-            'total_expenses': total_expenses,
             'total_spending': float(total_spending),
-            'total_members': total_members,
-            'total_paid': total_paid,
-            'total_unpaid': total_unpaid,
         },
         'leaderboards': {
             'top_spenders': top_spenders,
-            'most_generous': most_generous,
             'top_debtors': top_debtors,
+            'most_generous': most_generous,
+            'most_frequent_eaters': most_frequent_eaters,
+            'rarest_eaters': rarest_eaters,
+            'top_freeloaders': top_freeloaders,
             'longest_debts': longest_debts,
             'biggest_meals': biggest_meals,
             'cleanest_members': cleanest_members,
