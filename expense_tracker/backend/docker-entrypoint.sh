@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure media directories exist
+mkdir -p /app/media/avatars
+
 # Run migrations
 echo "Running migrations..."
 python manage.py migrate --noinput

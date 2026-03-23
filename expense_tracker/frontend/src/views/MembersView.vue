@@ -88,7 +88,8 @@
 					<template v-slot:item.name="{ item }">
 						<div class="member-info d-flex align-center">
 							<v-avatar color="primary" class="mr-3" size="32">
-								<span class="text-white font-weight-bold">
+								<v-img v-if="item.avatar_url" :src="item.avatar_url" />
+								<span v-else class="text-white font-weight-bold">
 									{{ item.name.charAt(0).toUpperCase() }}
 								</span>
 							</v-avatar>
@@ -399,6 +400,19 @@
 								<h4 class="section-title mb-4">
 									Thông tin cơ bản
 								</h4>
+
+								<!-- Avatar upload -->
+								<div class="form-group mb-4 d-flex flex-column align-center">
+									<v-avatar size="80" class="mb-2" color="grey-lighten-3">
+										<v-img v-if="avatarPreview || editedItem.avatar_url" :src="avatarPreview || editedItem.avatar_url" />
+										<v-icon v-else size="40" color="grey">mdi-account</v-icon>
+									</v-avatar>
+									<v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="triggerAvatarInput">
+										<v-icon size="16" class="mr-1">mdi-camera</v-icon>
+										Doi anh dai dien
+									</v-btn>
+									<input ref="avatarInput" type="file" accept="image/*" class="d-none" @change="onAvatarSelected" />
+								</div>
 
 								<div class="form-group mb-4">
 									<label class="form-label"
@@ -819,7 +833,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from "vue";
-import { membersApi, groupsApi, telegramApi } from "../services/api";
+import { membersApi, membersApi2, groupsApi, telegramApi } from "../services/api";
 import { useAuthStore } from "../stores/auth";
 
 const authStore = useAuthStore();
@@ -837,6 +851,22 @@ const editedIndex = ref(-1);
 const members = ref([]);
 const memberToDelete = ref(null);
 const debtSummary = ref(null as any);
+
+// Avatar upload
+const avatarInput = ref<HTMLInputElement | null>(null);
+const avatarPreview = ref<string | null>(null);
+const avatarFile = ref<File | null>(null);
+
+const triggerAvatarInput = () => {
+	avatarInput.value?.click();
+};
+
+const onAvatarSelected = (e: Event) => {
+	const file = (e.target as HTMLInputElement).files?.[0];
+	if (!file) return;
+	avatarFile.value = file;
+	avatarPreview.value = URL.createObjectURL(file);
+};
 
 // QR Logic
 const qrDialog = ref(false);
@@ -987,12 +1017,16 @@ const handleSearch = (val: string) => {
 const openAddDialog = () => {
 	editedIndex.value = -1;
 	editedItem.value = { ...defaultItem };
+	avatarPreview.value = null;
+	avatarFile.value = null;
 	dialog.value = true;
 };
 
 const editMember = (member: any) => {
 	editedIndex.value = members.value.indexOf(member);
 	editedItem.value = { ...member };
+	avatarPreview.value = null;
+	avatarFile.value = null;
 	dialog.value = true;
 };
 
@@ -1045,17 +1079,30 @@ const close = () => {
 	dialog.value = false;
 	editedItem.value = { ...defaultItem };
 	editedIndex.value = -1;
+	avatarPreview.value = null;
+	avatarFile.value = null;
 };
 
 const save = async () => {
 	saving.value = true;
 	try {
+		let memberId: number;
 		if (editedIndex.value > -1) {
 			await membersApi.update(editedItem.value.id, editedItem.value);
+			memberId = editedItem.value.id;
 			showNotification("Cập nhật thành viên thành công");
 		} else {
-			await membersApi.create(editedItem.value);
+			const res = await membersApi.create(editedItem.value);
+			memberId = res.data.id;
 			showNotification("Thêm thành viên mới thành công");
+		}
+		// Upload avatar if selected
+		if (avatarFile.value && memberId) {
+			try {
+				await membersApi2.uploadAvatar(memberId, avatarFile.value);
+			} catch (e) {
+				console.error("Avatar upload failed:", e);
+			}
 		}
 		await fetchMembers();
 		close();

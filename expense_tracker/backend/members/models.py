@@ -4,8 +4,9 @@ from django.db import models
 class Member(models.Model):
     name = models.CharField(max_length=100)
     telegram_id = models.CharField(max_length=50, unique=True)
-    bank_name = models.CharField(max_length=100, blank=True, null=True)  # THÊM
-    account_number = models.CharField(max_length=50, blank=True, null=True)  # THÊM
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    account_number = models.CharField(max_length=50, blank=True, null=True)
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     user = models.OneToOneField(
         'auth.User', on_delete=models.SET_NULL, null=True, blank=True,

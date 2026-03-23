@@ -1,72 +1,52 @@
 <template>
 	<div class="home-page">
 		<!-- Hero Section -->
-		<div class="hero-section text-center mb-12">
+		<div class="hero-section text-center mb-8">
 			<div class="hero-content">
-				<div class="hero-icon mb-6">
+				<div class="hero-icon mb-4">
 					<div class="icon-wrapper">
-						<v-icon size="64" class="hero-main-icon"
-							>mdi-calculator-variant</v-icon
-						>
+						<v-icon size="64" class="hero-main-icon">mdi-calculator-variant</v-icon>
 						<div class="icon-glow"></div>
 					</div>
 				</div>
-				<h1 class="hero-title text-5xl font-bold mb-4">
-					Danh sách chi tiêu
-				</h1>
+				<h1 class="hero-title text-5xl font-bold mb-3">Hom Nay An Gi</h1>
 				<p class="hero-subtitle text-xl mb-6">
-					Quản lý chi tiêu nhóm một cách thông minh và hiệu quả
+					Thong ke chi tieu nhom vui ve
 				</p>
 
-				<!-- Quick Stats -->
-				<div v-if="expenses.length > 0" class="quick-stats mb-8">
-					<v-row justify="center">
+				<!-- Overview Stats -->
+				<div v-if="stats" class="quick-stats mb-4">
+					<v-row justify="center" dense>
 						<v-col cols="auto">
-							<v-card
-								class="stats-card pa-4 mx-2"
-								rounded="xl"
-								elevation="0"
-							>
-								<div
-									class="stats-number text-2xl font-bold text-primary"
-								>
-									{{ expenses.length }}
+							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
+								<div class="stats-number text-2xl font-bold text-primary">
+									{{ formatCurrency(stats.overview.total_spending) }}
 								</div>
-								<div class="stats-label text-sm">
-									Khoản chi tiêu
-								</div>
+								<div class="stats-label text-sm">Tong chi tieu</div>
 							</v-card>
 						</v-col>
 						<v-col cols="auto">
-							<v-card
-								class="stats-card pa-4 mx-2"
-								rounded="xl"
-								elevation="0"
-							>
-								<div
-									class="stats-number text-2xl font-bold text-success"
-								>
-									{{ totalPaid }}
+							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
+								<div class="stats-number text-2xl font-bold text-secondary">
+									{{ stats.overview.total_expenses }}
 								</div>
-								<div class="stats-label text-sm">
-									Đã thanh toán
-								</div>
+								<div class="stats-label text-sm">Khoan chi</div>
 							</v-card>
 						</v-col>
 						<v-col cols="auto">
-							<v-card
-								class="stats-card pa-4 mx-2"
-								rounded="xl"
-								elevation="0"
-							>
-								<div
-									class="stats-number text-2xl font-bold text-error"
-								>
-									{{ totalUnpaid }}
+							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
+								<div class="stats-number text-2xl font-bold text-success">
+									{{ stats.overview.total_paid }}
 								</div>
-								<div class="stats-label text-sm">
-									Chưa thanh toán
+								<div class="stats-label text-sm">Da tra</div>
+							</v-card>
+						</v-col>
+						<v-col cols="auto">
+							<v-card class="stats-card pa-4 mx-1" rounded="xl" elevation="0">
+								<div class="stats-number text-2xl font-bold text-error">
+									{{ stats.overview.total_unpaid }}
 								</div>
+								<div class="stats-label text-sm">Chua tra</div>
 							</v-card>
 						</v-col>
 					</v-row>
@@ -74,209 +54,224 @@
 			</div>
 		</div>
 
-		<!-- Expenses Grid -->
-		<div v-if="expenses.length > 0">
-			<div class="section-header mb-6">
-				<h2 class="text-2xl font-bold text-gray-800">
-					Các khoản chi tiêu gần đây
-				</h2>
-				<p class="text-gray-600 mt-1">
-					Theo dõi và quản lý chi tiêu của bạn
-				</p>
+		<div v-if="loading" class="d-flex justify-center py-12">
+			<v-progress-circular indeterminate color="primary" size="48" />
+		</div>
+
+		<template v-else-if="stats">
+			<!-- Fun Leaderboards -->
+			<div class="section-header mb-4">
+				<h2 class="text-2xl font-bold">Bang xep hang vui</h2>
 			</div>
 
-			<v-row>
-				<v-col
-					v-for="(expense, index) in expenses"
-					:key="expense.id"
-					cols="12"
-					md="6"
-					lg="4"
-				>
-					<v-card
-						class="expense-card h-100"
-						rounded="xl"
-						elevation="0"
-						:style="`animation-delay: ${index * 100}ms`"
-						@click="navigateToDetail(expense.id)"
-					>
-						<!-- Card Header -->
-						<div class="card-header pa-6 pb-0">
-							<div
-								class="d-flex align-center justify-space-between mb-4"
-							>
-								<div class="expense-icon">
-									<v-icon size="24" color="white"
-										>mdi-receipt</v-icon
-									>
-								</div>
-								<div class="expense-status">
-									<v-chip
-										:color="getStatusColor(expense)"
-										size="small"
-										rounded="lg"
-									>
-										{{ getStatusText(expense) }}
-									</v-chip>
+			<v-row class="mb-8">
+				<!-- Top Spender -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.top_spender">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-gold"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="amber" size="28" class="mr-2">mdi-crown</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">Dai gia</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="amber-lighten-4">
+									<v-img v-if="stats.leaderboards.top_spender.avatar" :src="stats.leaderboards.top_spender.avatar" />
+									<v-icon v-else color="amber">mdi-cash-multiple</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.top_spender.name }}</div>
+									<div class="text-caption text-medium-emphasis">{{ stats.leaderboards.top_spender.count }} lan tra</div>
 								</div>
 							</div>
-							<h3 class="expense-title text-xl font-bold mb-2">
-								{{ expense.name }}
-							</h3>
-							<div class="expense-amount text-2xl font-bold mb-4">
-								{{ formatCurrency(expense.total_amount) }}
-							</div>
-						</div>
-
-						<!-- Card Content -->
-						<v-card-text class="pa-6 pt-0">
-							<div class="expense-details space-y-3">
-								<div class="detail-item d-flex align-center">
-									<v-icon
-										size="18"
-										color="success"
-										class="mr-3"
-										>mdi-account-cash</v-icon
-									>
-									<span class="detail-label">Người trả:</span>
-									<span
-										class="detail-value ml-auto font-medium"
-										>{{ expense.payer.name }}</span
-									>
-								</div>
-
-								<div class="detail-item d-flex align-center">
-									<v-icon
-										size="18"
-										color="orange"
-										class="mr-3"
-										>mdi-account-group</v-icon
-									>
-									<span class="detail-label">Số người:</span>
-									<span
-										class="detail-value ml-auto font-medium"
-										>{{ expense.participants.length }}</span
-									>
-								</div>
-
-								<div class="detail-item d-flex align-center">
-									<v-icon
-										size="18"
-										color="purple"
-										class="mr-3"
-										>mdi-calendar</v-icon
-									>
-									<span class="detail-label">Ngày tạo:</span>
-									<span
-										class="detail-value ml-auto font-medium"
-										>{{
-											formatDate(expense.created_at)
-										}}</span
-									>
-								</div>
-							</div>
-
-							<v-divider class="my-4"></v-divider>
-
-							<!-- Participants Status -->
-							<div class="participants-section">
-								<h4
-									class="participants-title font-medium mb-3 d-flex align-center"
-								>
-									<v-icon size="16" class="mr-2"
-										>mdi-chart-pie</v-icon
-									>
-									Trạng thái thanh toán
-								</h4>
-								<div class="participants-grid">
-									<v-chip
-										v-for="participant in expense.participants.slice(
-											0,
-											6
-										)"
-										:key="participant.id"
-										:color="
-											participant.is_paid
-												? 'success'
-												: 'error'
-										"
-										size="small"
-										rounded="lg"
-										class="ma-1"
-									>
-										<v-icon size="12" class="mr-1">
-											{{
-												participant.is_paid
-													? "mdi-check-circle"
-													: "mdi-clock-outline"
-											}}
-										</v-icon>
-										{{ participant.member.name }}
-									</v-chip>
-									<v-chip
-										v-if="expense.participants.length > 6"
-										color="surface-variant"
-										size="small"
-										rounded="lg"
-										class="ma-1"
-									>
-										+{{ expense.participants.length - 6 }}
-									</v-chip>
-								</div>
+							<div class="text-h5 font-weight-bold text-amber-darken-2">
+								{{ formatCurrency(stats.leaderboards.top_spender.total) }}
 							</div>
 						</v-card-text>
+					</v-card>
+				</v-col>
 
-						<!-- Card Actions -->
-						<v-card-actions class="pa-6 pt-0">
-							<v-btn
-								:to="`/expenses/${expense.id}`"
-								color="primary"
-								variant="elevated"
-								rounded="lg"
-								block
-								class="action-btn"
-							>
-								<v-icon size="18" class="mr-2">mdi-eye</v-icon>
-								Xem chi tiết
-							</v-btn>
-						</v-card-actions>
+				<!-- Top Debtor -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.top_debtor">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-red"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="error" size="28" class="mr-2">mdi-alert-circle</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">No nhieu nhat</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="red-lighten-4">
+									<v-img v-if="stats.leaderboards.top_debtor.avatar" :src="stats.leaderboards.top_debtor.avatar" />
+									<v-icon v-else color="error">mdi-emoticon-cry</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.top_debtor.name }}</div>
+									<div class="text-caption text-medium-emphasis">{{ stats.leaderboards.top_debtor.debt_count }} khoan no</div>
+								</div>
+							</div>
+							<div class="text-h5 font-weight-bold text-error">
+								{{ formatCurrency(stats.leaderboards.top_debtor.total_owed) }}
+							</div>
+						</v-card-text>
+					</v-card>
+				</v-col>
+
+				<!-- Most Generous -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.most_generous">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-green"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="success" size="28" class="mr-2">mdi-heart</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">Hay bao nhat</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="green-lighten-4">
+									<v-img v-if="stats.leaderboards.most_generous.avatar" :src="stats.leaderboards.most_generous.avatar" />
+									<v-icon v-else color="success">mdi-hand-heart</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.most_generous.name }}</div>
+									<div class="text-caption text-medium-emphasis">{{ stats.leaderboards.most_generous.count }} lan bao</div>
+								</div>
+							</div>
+							<div class="text-h5 font-weight-bold text-success">
+								{{ formatCurrency(stats.leaderboards.most_generous.total) }}
+							</div>
+						</v-card-text>
+					</v-card>
+				</v-col>
+
+				<!-- Longest Debt -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.longest_debt">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-purple"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="purple" size="28" class="mr-2">mdi-timer-sand</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">No lau nhat</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="purple-lighten-4">
+									<v-img v-if="stats.leaderboards.longest_debt.member_avatar" :src="stats.leaderboards.longest_debt.member_avatar" />
+									<v-icon v-else color="purple">mdi-sleep</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.longest_debt.member_name }}</div>
+									<div class="text-caption text-medium-emphasis">{{ stats.leaderboards.longest_debt.expense_name }}</div>
+								</div>
+							</div>
+							<div class="d-flex align-center">
+								<span class="text-h5 font-weight-bold text-purple">{{ stats.leaderboards.longest_debt.days_ago }} ngay</span>
+								<span class="text-caption ml-2 text-medium-emphasis">
+									({{ formatCurrency(stats.leaderboards.longest_debt.amount) }})
+								</span>
+							</div>
+						</v-card-text>
+					</v-card>
+				</v-col>
+
+				<!-- Biggest Meal -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.biggest_meal">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-orange"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="orange" size="28" class="mr-2">mdi-food</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">Bua an dat nhat</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="orange-lighten-4">
+									<v-img v-if="stats.leaderboards.biggest_meal.payer_avatar" :src="stats.leaderboards.biggest_meal.payer_avatar" />
+									<v-icon v-else color="orange">mdi-silverware-fork-knife</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.biggest_meal.name }}</div>
+									<div class="text-caption text-medium-emphasis">
+										{{ stats.leaderboards.biggest_meal.payer_name }} tra -
+										{{ stats.leaderboards.biggest_meal.participant_count }} nguoi
+									</div>
+								</div>
+							</div>
+							<div class="text-h5 font-weight-bold text-orange-darken-2">
+								{{ formatCurrency(stats.leaderboards.biggest_meal.amount) }}
+							</div>
+						</v-card-text>
+					</v-card>
+				</v-col>
+
+				<!-- Cleanest Member -->
+				<v-col cols="12" sm="6" md="4" v-if="stats.leaderboards.cleanest_member">
+					<v-card class="leaderboard-card h-100" rounded="xl" elevation="0">
+						<div class="card-accent accent-teal"></div>
+						<v-card-text class="pa-5">
+							<div class="d-flex align-center mb-3">
+								<v-icon color="teal" size="28" class="mr-2">mdi-star</v-icon>
+								<span class="text-caption font-weight-bold text-uppercase" style="letter-spacing: 1px">Sach no nhat</span>
+							</div>
+							<div class="d-flex align-center mb-3">
+								<v-avatar size="48" class="mr-3" color="teal-lighten-4">
+									<v-img v-if="stats.leaderboards.cleanest_member.avatar" :src="stats.leaderboards.cleanest_member.avatar" />
+									<v-icon v-else color="teal">mdi-check-decagram</v-icon>
+								</v-avatar>
+								<div>
+									<div class="font-weight-bold text-lg">{{ stats.leaderboards.cleanest_member.name }}</div>
+									<div class="text-caption text-medium-emphasis">Chi no co</div>
+								</div>
+							</div>
+							<div class="text-h5 font-weight-bold text-teal">
+								{{ formatCurrency(stats.leaderboards.cleanest_member.total_owed) }}
+							</div>
+						</v-card-text>
 					</v-card>
 				</v-col>
 			</v-row>
-		</div>
+
+			<!-- Charts Section -->
+			<div v-if="stats.charts.monthly_spending.length > 0 || stats.charts.spending_by_payer.length > 0">
+				<div class="section-header mb-4">
+					<h2 class="text-2xl font-bold">Bieu do</h2>
+				</div>
+
+				<v-row class="mb-8">
+					<!-- Monthly Spending Chart -->
+					<v-col cols="12" md="7" v-if="stats.charts.monthly_spending.length > 0">
+						<v-card class="chart-card pa-5" rounded="xl" elevation="0">
+							<h3 class="text-lg font-weight-bold mb-4">
+								<v-icon class="mr-2" color="primary">mdi-chart-line</v-icon>
+								Chi tieu theo thang
+							</h3>
+							<div class="chart-container">
+								<Bar :data="monthlyChartData" :options="barChartOptions" />
+							</div>
+						</v-card>
+					</v-col>
+
+					<!-- Spending by Payer Chart -->
+					<v-col cols="12" md="5" v-if="stats.charts.spending_by_payer.length > 0">
+						<v-card class="chart-card pa-5" rounded="xl" elevation="0">
+							<h3 class="text-lg font-weight-bold mb-4">
+								<v-icon class="mr-2" color="secondary">mdi-chart-pie</v-icon>
+								Ai tra nhieu nhat
+							</h3>
+							<div class="chart-container">
+								<Doughnut :data="payerChartData" :options="doughnutChartOptions" />
+							</div>
+						</v-card>
+					</v-col>
+				</v-row>
+			</div>
+		</template>
 
 		<!-- Empty State -->
-		<div v-else class="empty-state">
-			<v-card
-				class="empty-card text-center pa-12"
-				rounded="xl"
-				elevation="0"
-			>
-				<div class="empty-icon mb-6">
-					<v-icon size="96" color="surface-variant"
-						>mdi-receipt-text-outline</v-icon
-					>
-					<div class="empty-decoration"></div>
-				</div>
-				<h3 class="empty-title text-2xl font-bold mb-4">
-					Chưa có khoản chi tiêu nào
-				</h3>
-				<p class="empty-subtitle text-lg text-on-surface-variant mb-8">
-					Hãy tạo khoản chi tiêu đầu tiên để bắt đầu quản lý tài chính
-					nhóm
+		<div v-else-if="!loading" class="empty-state">
+			<v-card class="empty-card text-center pa-12" rounded="xl" elevation="0">
+				<v-icon size="96" color="surface-variant">mdi-chart-box-outline</v-icon>
+				<h3 class="text-2xl font-bold mb-4 mt-4">Chua co du lieu</h3>
+				<p class="text-lg text-on-surface-variant">
+					Hay tao khoan chi tieu dau tien!
 				</p>
-				<v-btn
-					v-if="authStore.isAuthenticated"
-					to="/expenses"
-					color="primary"
-					variant="elevated"
-					size="large"
-					rounded="xl"
-					class="px-8 py-2"
-				>
-					<v-icon size="20" class="mr-2">mdi-plus</v-icon>
-					Tạo chi tiêu đầu tiên
-				</v-btn>
 			</v-card>
 		</div>
 	</div>
@@ -284,55 +279,40 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import { expensesApi } from "../services/api";
-import { useAuthStore } from "../stores/auth";
+import { statsApi } from "../services/api";
+import { Bar, Doughnut } from "vue-chartjs";
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	ArcElement,
+	Title,
+	Tooltip,
+	Legend,
+} from "chart.js";
 
-const router = useRouter();
-const authStore = useAuthStore();
-const expenses = ref([]);
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
-const totalPaid = computed(() => {
-	return expenses.value.reduce((total, expense) => {
-		return total + expense.participants.filter((p) => p.is_paid).length;
-	}, 0);
-});
+const stats = ref<any>(null);
+const loading = ref(true);
 
-const totalUnpaid = computed(() => {
-	return expenses.value.reduce((total, expense) => {
-		return total + expense.participants.filter((p) => !p.is_paid).length;
-	}, 0);
-});
+const CHART_COLORS = [
+	"#667eea", "#764ba2", "#f093fb", "#43e97b", "#fa709a",
+	"#fee140", "#30cfd0", "#a18cd1", "#fbc2eb", "#ff9a9e",
+];
 
-const fetchExpenses = async () => {
+const fetchStats = async () => {
+	loading.value = true;
 	try {
-		const response = await expensesApi.getAll();
-		expenses.value = response.data;
+		const response = await statsApi.getPublicStats();
+		stats.value = response.data;
 	} catch (error) {
-		console.error("Error fetching expenses:", error);
+		console.error("Error fetching stats:", error);
+	} finally {
+		loading.value = false;
 	}
-};
-
-const navigateToDetail = (expenseId) => {
-	router.push(`/expenses/${expenseId}`);
-};
-
-const getStatusColor = (expense) => {
-	const paidCount = expense.participants.filter((p) => p.is_paid).length;
-	const totalCount = expense.participants.length;
-
-	if (paidCount === totalCount) return "success";
-	if (paidCount === 0) return "error";
-	return "warning";
-};
-
-const getStatusText = (expense) => {
-	const paidCount = expense.participants.filter((p) => p.is_paid).length;
-	const totalCount = expense.participants.length;
-
-	if (paidCount === totalCount) return "Hoàn thành";
-	if (paidCount === 0) return "Chưa thanh toán";
-	return `${paidCount}/${totalCount} đã trả`;
 };
 
 const formatCurrency = (amount: number) => {
@@ -342,11 +322,89 @@ const formatCurrency = (amount: number) => {
 	}).format(amount);
 };
 
-const formatDate = (dateString: string) => {
-	return new Date(dateString).toLocaleDateString("vi-VN");
+// Monthly spending bar chart data
+const monthlyChartData = computed(() => {
+	if (!stats.value) return { labels: [], datasets: [] };
+	const data = stats.value.charts.monthly_spending;
+	return {
+		labels: data.map((item: any) => {
+			const [y, m] = item.month.split("-");
+			return `T${m}/${y}`;
+		}),
+		datasets: [
+			{
+				label: "Chi tieu (VND)",
+				data: data.map((item: any) => item.total),
+				backgroundColor: "rgba(102, 126, 234, 0.7)",
+				borderColor: "#667eea",
+				borderWidth: 2,
+				borderRadius: 8,
+			},
+		],
+	};
+});
+
+// Spending by payer doughnut chart data
+const payerChartData = computed(() => {
+	if (!stats.value) return { labels: [], datasets: [] };
+	const data = stats.value.charts.spending_by_payer;
+	return {
+		labels: data.map((item: any) => item.name),
+		datasets: [
+			{
+				data: data.map((item: any) => item.total),
+				backgroundColor: CHART_COLORS.slice(0, data.length),
+				borderWidth: 2,
+				borderColor: "#fff",
+			},
+		],
+	};
+});
+
+const barChartOptions = {
+	responsive: true,
+	maintainAspectRatio: false,
+	plugins: {
+		legend: { display: false },
+		tooltip: {
+			callbacks: {
+				label: (ctx: any) => formatCurrency(ctx.parsed.y),
+			},
+		},
+	},
+	scales: {
+		y: {
+			beginAtZero: true,
+			ticks: {
+				callback: (val: any) => {
+					if (val >= 1000000) return `${val / 1000000}M`;
+					if (val >= 1000) return `${val / 1000}K`;
+					return val;
+				},
+			},
+			grid: { color: "rgba(0,0,0,0.05)" },
+		},
+		x: { grid: { display: false } },
+	},
 };
 
-onMounted(fetchExpenses);
+const doughnutChartOptions = {
+	responsive: true,
+	maintainAspectRatio: false,
+	plugins: {
+		legend: {
+			position: "bottom" as const,
+			labels: { padding: 16, usePointStyle: true },
+		},
+		tooltip: {
+			callbacks: {
+				label: (ctx: any) => `${ctx.label}: ${formatCurrency(ctx.parsed)}`,
+			},
+		},
+	},
+};
+
+onMounted(fetchStats);
 </script>
 
 <style scoped>
@@ -357,7 +415,7 @@ onMounted(fetchExpenses);
 
 .hero-section {
 	position: relative;
-	padding: 4rem 0;
+	padding: 3rem 0 1rem;
 }
 
 .hero-content {
@@ -389,25 +447,14 @@ onMounted(fetchExpenses);
 	transform: translate(-50%, -50%);
 	width: 120px;
 	height: 120px;
-	background: radial-gradient(
-		circle,
-		rgba(102, 126, 234, 0.1) 0%,
-		transparent 70%
-	);
+	background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
 	border-radius: 50%;
 	animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
-	0%,
-	100% {
-		transform: translate(-50%, -50%) scale(1);
-		opacity: 0.5;
-	}
-	50% {
-		transform: translate(-50%, -50%) scale(1.1);
-		opacity: 0.8;
-	}
+	0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+	50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
 }
 
 .hero-title {
@@ -417,127 +464,69 @@ onMounted(fetchExpenses);
 	line-height: 1.2;
 }
 
-.hero-subtitle {
-	color: rgb(107, 114, 128);
-}
-
-.quick-stats {
-	position: relative;
-}
+.hero-subtitle { color: rgb(107, 114, 128); }
 
 .stats-card {
 	background: rgba(255, 255, 255, 0.8);
 	backdrop-filter: blur(10px);
 	border: 1px solid rgba(102, 126, 234, 0.1);
 	transition: transform 0.2s ease;
-	min-width: 120px;
+	min-width: 110px;
 }
 
-.stats-card:hover {
-	transform: translateY(-2px);
-}
+.stats-card:hover { transform: translateY(-2px); }
+.stats-label { color: rgb(107, 114, 128); font-weight: 500; }
 
-.stats-number {
-	line-height: 1;
-}
+.section-header { text-align: left; }
 
-.stats-label {
-	color: rgb(107, 114, 128);
-	font-weight: 500;
-}
-
-.section-header {
-	text-align: left;
-}
-
-.expense-card {
+/* Leaderboard cards */
+.leaderboard-card {
 	background: rgba(255, 255, 255, 0.9);
 	backdrop-filter: blur(10px);
-	border: 1px solid rgba(102, 126, 234, 0.1);
+	border: 1px solid rgba(0, 0, 0, 0.06);
+	position: relative;
+	overflow: hidden;
 	transition: all 0.3s ease;
-	cursor: pointer;
-	animation: fadeInUp 0.6s ease forwards;
-	opacity: 0;
-	transform: translateY(20px);
 }
 
-@keyframes fadeInUp {
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
+.leaderboard-card:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
 }
 
-.expense-card:hover {
-	transform: translateY(-8px);
-	box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+.card-accent {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
 }
 
-.card-header {
-	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-	color: white;
-	border-radius: 16px 16px 0 0;
+.accent-gold { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.accent-red { background: linear-gradient(90deg, #ef4444, #f87171); }
+.accent-green { background: linear-gradient(90deg, #10b981, #34d399); }
+.accent-purple { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.accent-orange { background: linear-gradient(90deg, #f97316, #fb923c); }
+.accent-teal { background: linear-gradient(90deg, #14b8a6, #2dd4bf); }
+
+/* Chart cards */
+.chart-card {
+	background: rgba(255, 255, 255, 0.9);
+	backdrop-filter: blur(10px);
+	border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.expense-icon {
-	width: 40px;
-	height: 40px;
-	border-radius: 10px;
-	background: rgba(255, 255, 255, 0.2);
-	display: flex;
-	align-items: center;
-	justify-content: center;
+.chart-container {
+	height: 300px;
+	position: relative;
 }
 
-.expense-title {
-	color: white;
-	line-height: 1.3;
-}
-
-.expense-amount {
-	color: rgba(255, 255, 255, 0.95);
-}
-
-.detail-item {
-	padding: 0.5rem 0;
-}
-
-.detail-label {
-	color: rgb(107, 114, 128);
-	font-size: 0.875rem;
-}
-
-.detail-value {
-	color: rgb(55, 65, 81);
-	font-size: 0.875rem;
-}
-
-.participants-title {
-	color: rgb(75, 85, 99);
-	font-size: 0.875rem;
-}
-
-.participants-grid {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.25rem;
-	margin: -0.25rem;
-}
-
-.action-btn {
-	font-weight: 500;
-	text-transform: none;
-}
-
-.action-btn:hover {
-	transform: translateY(-1px);
-}
-
+/* Empty state */
 .empty-state {
 	display: flex;
 	justify-content: center;
 	align-items: center;
-	min-height: 400px;
+	min-height: 300px;
 }
 
 .empty-card {
@@ -545,89 +534,17 @@ onMounted(fetchExpenses);
 	backdrop-filter: blur(10px);
 	border: 1px solid rgba(102, 126, 234, 0.1);
 	max-width: 500px;
-	position: relative;
-	overflow: hidden;
-}
-
-.empty-icon {
-	position: relative;
-	display: inline-block;
-}
-
-.empty-decoration {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	width: 150px;
-	height: 150px;
-	background: radial-gradient(
-		circle,
-		rgba(102, 126, 234, 0.05) 0%,
-		transparent 70%
-	);
-	border-radius: 50%;
-	animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-	0%,
-	100% {
-		transform: translate(-50%, -50%) translateY(0px);
-	}
-	50% {
-		transform: translate(-50%, -50%) translateY(-10px);
-	}
-}
-
-.empty-title {
-	color: rgb(31, 41, 55);
-}
-
-.empty-subtitle {
-	max-width: 400px;
-	margin: 0 auto;
 }
 
 @media (max-width: 768px) {
-	.hero-title {
-		font-size: 2.25rem;
-	}
-
-	.hero-subtitle {
-		font-size: 1.125rem;
-	}
-
-	.quick-stats .v-col {
-		flex: 1;
-		max-width: none;
-	}
-
-	.stats-card {
-		margin: 0.25rem !important;
-	}
+	.hero-title { font-size: 2.25rem; }
+	.hero-subtitle { font-size: 1.125rem; }
+	.stats-card { min-width: 90px; padding: 0.75rem !important; }
 }
 
 @media (max-width: 600px) {
-	.hero-section {
-		padding: 2rem 0;
-	}
-
-	.hero-title {
-		font-size: 1.875rem;
-	}
-
-	.stats-card {
-		min-width: 100px;
-		padding: 0.75rem !important;
-	}
-
-	.stats-number {
-		font-size: 1.5rem;
-	}
-
-	.empty-card {
-		padding: 2rem 1.5rem !important;
-	}
+	.hero-section { padding: 1.5rem 0 0.5rem; }
+	.hero-title { font-size: 1.875rem; }
+	.chart-container { height: 250px; }
 }
 </style>

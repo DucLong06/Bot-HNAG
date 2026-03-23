@@ -23,6 +23,27 @@ class MemberViewSet(viewsets.ModelViewSet):
             return MemberAdminSerializer
         return MemberSerializer
 
+    @action(detail=True, methods=['post'], url_path='upload-avatar')
+    def upload_avatar(self, request, pk=None):
+        member = self.get_object()
+        avatar = request.FILES.get('avatar')
+        if not avatar:
+            return Response({'error': 'No avatar file provided'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate file size (max 5MB)
+        if avatar.size > 5 * 1024 * 1024:
+            return Response({'error': 'File too large (max 5MB)'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+        if avatar.content_type not in allowed_types:
+            return Response({'error': 'Invalid file type'}, status=status.HTTP_400_BAD_REQUEST)
+        # Delete old avatar file if exists
+        if member.avatar:
+            member.avatar.delete(save=False)
+        member.avatar = avatar
+        member.save()
+        avatar_url = request.build_absolute_uri(member.avatar.url)
+        return Response({'avatar_url': avatar_url})
+
     @action(detail=True, methods=['get'])
     def debt_summary(self, request, pk=None):
         member = self.get_object()

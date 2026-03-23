@@ -87,6 +87,20 @@ export const groupsApi = {
     delete: (id: number) => api.delete(`/members/groups/${id}/`),
 }
 
+export const statsApi = {
+    getPublicStats: () => axios.get(`${API_BASE_URL}/stats/`, { withCredentials: true }),
+}
+
+export const membersApi2 = {
+    uploadAvatar: (id: number, file: File) => {
+        const formData = new FormData()
+        formData.append('avatar', file)
+        return api.post(`/members/${id}/upload-avatar/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+    }
+}
+
 export const telegramApi = {
     sendReminder: (memberId: number) =>
         api.post('/telegram/send-reminder/', { member_id: memberId }),

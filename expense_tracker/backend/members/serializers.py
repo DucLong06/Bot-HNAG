@@ -4,24 +4,44 @@ from .models import Member, MemberGroup
 
 class MemberSerializer(serializers.ModelSerializer):
     """Base serializer - hides telegram_id from non-admin users"""
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Member
-        fields = ['id', 'name', 'bank_name', 'account_number', 'created_at']
+        fields = ['id', 'name', 'bank_name', 'account_number', 'avatar_url', 'created_at']
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 
 class MemberWriteSerializer(serializers.ModelSerializer):
-    """Write serializer - accepts telegram_id for create/update but hides it in response"""
+    """Write serializer - accepts telegram_id and avatar for create/update"""
     class Meta:
         model = Member
-        fields = ['id', 'name', 'telegram_id', 'bank_name', 'account_number', 'created_at']
+        fields = ['id', 'name', 'telegram_id', 'bank_name', 'account_number', 'avatar', 'created_at']
         extra_kwargs = {'telegram_id': {'write_only': True}}
 
 
 class MemberAdminSerializer(serializers.ModelSerializer):
     """Admin serializer - shows telegram_id"""
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Member
-        fields = ['id', 'name', 'telegram_id', 'bank_name', 'account_number', 'created_at']
+        fields = ['id', 'name', 'telegram_id', 'bank_name', 'account_number', 'avatar_url', 'created_at']
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 
 class MemberGroupSerializer(serializers.ModelSerializer):

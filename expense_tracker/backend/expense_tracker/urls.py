@@ -57,12 +57,15 @@ def api_logout(request):
     return JsonResponse({'message': 'Logged out'})
 
 
+from expenses.stats_view import public_stats
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/csrf/', get_csrf_token, name='api-csrf'),
     path('api/login/', api_login, name='api-login'),
     path('api/logout/', api_logout, name='api-logout'),
     path('api/user/', api_user, name='api-user'),
+    path('api/stats/', public_stats, name='api-stats'),
     path('api/members/', include('members.urls')),
     path('api/expenses/', include('expenses.urls')),
     path('api/telegram/', include('telegram_bot.urls')),
